@@ -28,7 +28,6 @@
     </params>
 </plugin>
 """
-import Domoticz
 
 # Fix import of libs installed with pip as PluginSystem has a wierd pythonpath...
 import os
@@ -38,17 +37,16 @@ for mp in site.getsitepackages():
     sys.path.append(mp)
 import miio
 
+import Domoticz
+
 class CacheStatus(object):
     def __init__(self, status):
       self.status = status
       self.cache = {}
 
     def __getattr__(self, name):
-        Domoticz.Log("__getattr__ name:" + name)
         if name not in self.cache:
-            Domoticz.Log("__getattr__ cache not has:" + name)
             value = getattr(self.status, name)
-            Domoticz.Log("__getattr__ value:" + str(value))
             if value is not None:
                 self.cache[name] = value
             else:
@@ -56,9 +54,7 @@ class CacheStatus(object):
         return self.cache[name]
 
     def __setattr__(self, name, value):
-        Domoticz.Log("__setattr__ name:" + name)
         if(name == 'status' or name == 'cache'):
-            Domoticz.Log("__setattr__ nomarl attr:" + name)
             super(CacheStatus, self).__setattr__(name, value)
             return
         self.cache[name] = value
@@ -188,6 +184,8 @@ class ChuangmiPlugPlugin:
         else:
             Domoticz.Error("Unknown Unit number : " + str(Unit))
 
+        # update status
+        self.UpdateStatus()
         return
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
