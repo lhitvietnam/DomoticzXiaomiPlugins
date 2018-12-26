@@ -1,28 +1,31 @@
+# coding=UTF-8
 # Python Plugin for Xiaomi Miio Plug
 #
 # Author: xiaoyao9184 
 #
 """
-<plugin key="Xiaomi-Miio-Chuangmi-Plug" 
+<plugin 
+    key="Xiaomi-Miio-Chuangmi-Plug" 
     name="Xiaomi Miio Chuangmi Plug" 
-    author="xiaoyao9184" version="0.1" 
+    author="xiaoyao9184" 
+    version="0.1" 
     externallink="https://github.com/xiaoyao9184/DomoticzXiaomiPlugins">
     <params>
+        <param field="Mode1" label="Debug" width="200px">
+            <options>
+                <option label="None" value="none" default="none"/>
+                <option label="Debug(Only Domoticz)" value="debug"/>
+                <option label="Debug(Attach by ptvsd)" value="ptvsd"/>
+            </options>
+        </param>
         <param field="Address" label="IP" width="100px" required="true"/>
-        <param field="Mode1" label="Token" width="250px" required="true"/>
-        <param field="Mode2" label="Mode" width="150px">
+        <param field="Mode2" label="Token" width="250px" required="true"/>
+        <param field="Mode3" label="Mode" width="150px">
             <options>
                 <option label="chuangmi.plug.m1" value="chuangmi.plug.m1" default="chuangmi.plug.m1"/>
                 <option label="chuangmi.plug.v1" value="chuangmi.plug.v1"/>
                 <option label="chuangmi.plug.v2" value="chuangmi.plug.v2"/>
                 <option label="chuangmi.plug.v3" value="chuangmi.plug.v3"/>
-            </options>
-        </param>
-        <param field="Mode3" label="Debug" width="200px">
-            <options>
-                <option label="None" value="none" default="none"/>
-                <option label="Debug(Only Domoticz)" value="debug"/>
-                <option label="Debug(Attach by ptvsd)" value="ptvsd"/>
             </options>
         </param>
     </params>
@@ -35,9 +38,9 @@ import sys
 import site
 for mp in site.getsitepackages():
     sys.path.append(mp)
-import miio
 
 import Domoticz
+import miio
 
 class CacheStatus(object):
     def __init__(self, status):
@@ -77,25 +80,25 @@ class ChuangmiPlugPlugin:
     def onStart(self):
         # Debug
         debug = 0
-        if (Parameters["Mode3"] != "none"):
+        if (Parameters["Mode1"] != "none"):
             Domoticz.Debugging(1)
             debug = 1
         
-        if (Parameters["Mode3"] == 'ptvsd'):
+        if (Parameters["Mode1"] == 'ptvsd'):
             Domoticz.Log("Debugger ptvsd started, use 0.0.0.0:5678 to attach")
             import ptvsd 
             ptvsd.enable_attach()
             ptvsd.wait_for_attach()
-        elif (Parameters["Mode3"] == 'rpdb'):
-            Domoticz.Log("Debugger rpdb started, use 'telnet 0.0.0.0 4444' to connect")
+        elif (Parameters["Mode1"] == 'rpdb'):
+            Domoticz.Log("Debugger rpdb started, use 'telnet 127.0.0.1 4444' on host to connect")
             import rpdb
             rpdb.set_trace()
 
 
         # Create miio
         ip = Parameters["Address"]
-        token = Parameters["Mode1"]
-        mode = Parameters["Mode2"]
+        token = Parameters["Mode2"]
+        mode = Parameters["Mode3"]
         self.miio = miio.chuangmi_plug.ChuangmiPlug(ip, token, 0, debug, True, mode)
         Domoticz.Debug("Xiaomi Miio Chuangmi created with address '" + ip
             + "' and token '" + token

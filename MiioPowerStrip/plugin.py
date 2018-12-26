@@ -1,11 +1,14 @@
+# coding=UTF-8
 # Python Plugin for Xiaomi Miio Plug
 #
 # Author: xiaoyao9184 
 #
 """
-<plugin key="Xiaomi-Miio-PowerStrip" 
+<plugin 
+    key="Xiaomi-Miio-PowerStrip" 
     name="Xiaomi Miio PowerStrip" 
-    author="xiaoyao9184" version="0.1" 
+    author="xiaoyao9184" 
+    version="0.1" 
     externallink="https://github.com/xiaoyao9184/DomoticzXiaomiPlugins">
     <params>
         <param field="Mode1" label="Debug" width="200px">
@@ -34,9 +37,9 @@ import sys
 import site
 for mp in site.getsitepackages():
     sys.path.append(mp)
-import miio
 
 import Domoticz
+import miio
 
 class CacheStatus(object):
     def __init__(self, status):
