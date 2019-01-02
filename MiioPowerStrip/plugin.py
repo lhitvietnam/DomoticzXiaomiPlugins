@@ -16,17 +16,19 @@
                 <option label="None" value="none" default="none"/>
                 <option label="Debug(Only Domoticz)" value="debug"/>
                 <option label="Debug(Attach by ptvsd)" value="ptvsd"/>
+                <option label="Debug(Attach by rpdb)" value="rpdb"/>
             </options>
         </param>
+        <param field="Mode2" label="Repeat Time(s)" width="30px" required="true" default="30"/>
         <param field="Address" label="IP" width="100px" required="true"/>
-        <param field="Mode2" label="Token" width="250px" required="true"/>
-        <param field="Mode3" label="Mode" width="150px">
+        <param field="Mode3" label="Token" width="250px" required="true"/>
+        <param field="Mode4" label="Mode" width="150px">
             <options>
                 <option label="qmi.powerstrip.v1" value="qmi.powerstrip.v1" default="qmi.powerstrip.v1"/>
                 <option label="zimi.powerstrip.v2" value="zimi.powerstrip.v2"/>
             </options>
         </param>
-        <param field="Mode4" label="Unit Price" width="50px"/>
+        <param field="Mode5" label="Unit Price" width="50px"/>
     </params>
 </plugin>
 """
@@ -40,6 +42,75 @@ for mp in site.getsitepackages():
 
 import Domoticz
 import miio
+
+
+class Heartbeat():
+
+    def __init__(self, interval):
+        self.callback = None
+        self.count = 0
+        # stage interval
+        self.seek = 0
+        self.interval = 10
+        # real interval
+        self.total = 10
+        if (interval < 0):
+            pass
+        elif (0 < interval and interval < 30):
+            self.interval = interval
+            self.total = interval
+        else:
+            result = self.show_factor(interval, self.filter_factor, self.bast_factor)
+            self.seek = result["repeat"]
+            self.interval = result["factor"]
+            self.total = result["number"]
+
+    def setHeartbeat(self, func_callback):
+        Domoticz.Heartbeat(self.interval)
+        Domoticz.Log("Heartbeat total interval set to: " + str(self.total) + ".")
+        self.callback = func_callback
+            
+    def beatHeartbeat(self):
+        self.count += 1
+        if (self.count >= self.seek):
+            self.count = 0
+            if self.callback is not None:
+                Domoticz.Log("Calling heartbeat handler " + str(self.callback.__name__) + ".")
+                self.callback()
+        else:
+            Domoticz.Log("Skip heartbeat handler bacause stage not enough " + str(self.count) + "/" + str(self.seek) + ".")
+
+    def filter_factor(self, factor):
+        return factor < 30 and factor > 5
+
+    def show_factor(self, number, func_filter, func_prime):
+        factor = number // 2
+        while factor > 1:
+            if number % factor == 0 and func_filter(factor):
+                return {
+                    "number": number,
+                    "factor": factor,
+                    "repeat": int(number / factor)
+                }
+            factor-=1
+        else:
+            return func_prime(number)
+
+    def next_factor(self, number):
+        return self.show_factor(number + 1, self.filter_factor, self.next_factor)
+
+    def last_factor(self, number):
+        return self.show_factor(number - 1, self.filter_factor, self.last_factor)
+
+    def bast_factor(self, number):
+        n = self.next_factor(number)
+        l = self.last_factor(number)
+
+        if n["factor"] >= l["factor"]:
+            return n
+        else:
+            return l
+
 
 class CacheStatus(object):
     def __init__(self, status):
@@ -90,20 +161,26 @@ class PowerStripPlugin:
         
         if (Parameters["Mode1"] == 'ptvsd'):
             Domoticz.Log("Debugger ptvsd started, use 0.0.0.0:5678 to attach")
-            import ptvsd 
+            import ptvsd
+            # signal error on raspberry
             ptvsd.enable_attach()
             ptvsd.wait_for_attach()
         elif (Parameters["Mode1"] == 'rpdb'):
             Domoticz.Log("Debugger rpdb started, use 'telnet 0.0.0.0 4444' to connect")
             import rpdb
             rpdb.set_trace()
+            # signal error on raspberry
+            # rpdb.handle_trap("0.0.0.0", 4444)
 
+        # Heartbeat
+        self.heartbeat = Heartbeat(int(Parameters["Mode2"]))
+        self.heartbeat.setHeartbeat(self.UpdateStatus)
 
         # Create miio
         ip = Parameters["Address"]
-        token = Parameters["Mode2"]
-        mode = Parameters["Mode3"]
-        price = Parameters["Mode4"]
+        token = Parameters["Mode3"]
+        mode = Parameters["Mode4"]
+        price = Parameters["Mode5"]
         self.miio = miio.powerstrip.PowerStrip(ip, token, 0, debug, True, mode)
         Domoticz.Debug("Xiaomi Miio PowerStrip created with address '" + ip
             + "' and token '" + token
@@ -250,10 +327,7 @@ class PowerStripPlugin:
         return
 
     def onHeartbeat(self):
-        self.heartbeatCount += 1
-        if (self.heartbeatCount == 10): # Each minute
-            self.UpdateStatus()
-            self.heartbeatCount = 0
+        self.heartbeat.beatHeartbeat()
         return
 
 
