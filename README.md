@@ -2,6 +2,14 @@
 
 This project is an attempt to make Python plugins for Xiaomi devices in Domoticz, using the python-miio library.
 
+# Use
+
+Raspberry Pi/Ubuntu installation:
+
+```curl -L https://github.com/xiaoyao9184/DomoticzXiaomiPlugins/raw/master/install.sh | bash```
+
+**NOTE:** must updated domoticz to version 4.10 (now is beta version)
+
 # See
 
 - Domoticz : https://github.com/domoticz/domoticz
