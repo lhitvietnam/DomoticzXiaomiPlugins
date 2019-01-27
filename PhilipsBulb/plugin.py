@@ -128,20 +128,46 @@ class CacheStatus(object):
 
 class PhilipsBulbPlugin:
 
-    unit_brightness = 1
-    unit_color_temperature = 2
-    unit_scene = 3
+    __UNIT_BRIGHTNESS = 1
+    __UNIT_COLOR_TEMPERATURE = 2
+    __UNIT_SCENE = 3
 
-    dict_level_scene = {'50': 0, '10': 1, '20': 2, '30': 3, '40': 4}
-
-    def getKeyByValue(self, target, value):
-        return list(target.keys())[list(target.values()).index(value)]
+    __UNITS = [
+        {
+            "_Name": "PhilipsBulb_Brightness", 
+            "_Unit": __UNIT_BRIGHTNESS, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / Dimmer
+            "_Switchtype": 7,
+            "_Options": None
+        },
+        {
+            "_Name": "PhilipsBulb_Color_Temperature", 
+            "_Unit": __UNIT_COLOR_TEMPERATURE, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / Dimmer
+            "_Switchtype": 7,
+            "_Options": None
+        },
+        {
+            "_Name": "PhilipsBulb_Scene", 
+            "_Unit": __UNIT_SCENE, 
+            "_TypeName": "Selector Switch", 
+            "_Switchtype": 18,
+            "_Options": {
+                "LevelActions"  :"|||||" , 
+                "LevelNames"    :"None|Bright|TV|Warm|Night" ,
+                "LevelOffHidden":"true",
+                "SelectorStyle" :"0"
+            },
+            "map_level_value": {'10': 1, '20': 2, '30': 3, '40': 4}
+        }
+    ]
 
     def __init__(self):
         self.miio = None
         self.status = None
         return
-
 
     def onStart(self):
         # Debug
@@ -174,44 +200,54 @@ class PhilipsBulbPlugin:
         Domoticz.Debug("Xiaomi Miio Philips Bulb created with address '" + ip
             + "' and token '" + token + "'")
 
-        # Add main devices
-        if (self.unit_brightness not in Devices):
-            # Selector Switch / Dimmer
-            # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
-            Domoticz.Device(
-                Name = "PhilipsBulb_Brightness", 
-                Unit = self.unit_brightness, 
-                # Type = 241, 
-                # Subtype = 8,
-                TypeName = "Selector Switch", 
-                Switchtype = 7).Create()
+        # Create devices
+        for unit in self.__UNITS:
+            if unit["_Unit"] not in Devices:
+                Domoticz.Device(
+                    Name = unit["_Name"], 
+                    Unit = unit["_Unit"],
+                    TypeName = unit["_TypeName"], 
+                    Switchtype = unit["_Switchtype"],
+                    Options = unit["_Options"]).Create()
 
-        if (self.unit_color_temperature not in Devices):
-            # Selector Switch / Dimmer
-            # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
-            Domoticz.Device(
-                Name = "PhilipsBulb_Color_Temperature", 
-                Unit = self.unit_color_temperature, 
-                # Type = 241, 
-                # Subtype = 8,
-                TypeName = "Selector Switch", 
-                Switchtype = 7).Create()
+        # # Add main devices
+        # if (self.__UNIT_BRIGHTNESS not in Devices):
+        #     # Selector Switch / Dimmer
+        #     # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
+        #     Domoticz.Device(
+        #         Name = "PhilipsBulb_Brightness", 
+        #         Unit = self.__UNIT_BRIGHTNESS, 
+        #         # Type = 241, 
+        #         # Subtype = 8,
+        #         TypeName = "Selector Switch", 
+        #         Switchtype = 7).Create()
 
-        # Add scene device
-        Options =   {    
-            "LevelActions"  :"|||||" , 
-            "LevelNames"    :"None|Bright|TV|Warm|Night" ,
-            "LevelOffHidden":"true",
-            "SelectorStyle" :"0"
-        }
-        if (self.unit_scene not in Devices):
-            # Selector Switch / Selector
-            Domoticz.Device(
-                Name = "PhilipsBulb_Scene", 
-                Unit = self.unit_scene, 
-                TypeName = "Selector Switch", 
-                Switchtype = 18, 
-                Options = Options).Create()
+        # if (self.__UNIT_COLOR_TEMPERATURE not in Devices):
+        #     # Selector Switch / Dimmer
+        #     # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
+        #     Domoticz.Device(
+        #         Name = "PhilipsBulb_Color_Temperature", 
+        #         Unit = self.__UNIT_COLOR_TEMPERATURE, 
+        #         # Type = 241, 
+        #         # Subtype = 8,
+        #         TypeName = "Selector Switch", 
+        #         Switchtype = 7).Create()
+
+        # # Add scene device
+        # Options =   {    
+        #     "LevelActions"  :"|||||" , 
+        #     "LevelNames"    :"None|Bright|TV|Warm|Night" ,
+        #     "LevelOffHidden":"true",
+        #     "SelectorStyle" :"0"
+        # }
+        # if (self.__UNIT_SCENE not in Devices):
+        #     # Selector Switch / Selector
+        #     Domoticz.Device(
+        #         Name = "PhilipsBulb_Scene", 
+        #         Unit = self.__UNIT_SCENE, 
+        #         TypeName = "Selector Switch", 
+        #         Switchtype = 18, 
+        #         Options = Options).Create()
 
         # Read initial state
         self.UpdateStatus()
@@ -246,24 +282,22 @@ class PhilipsBulbPlugin:
     def onCommand(self, Unit, Command, Level, Hue):
         Domoticz.Debug("onCommand called: Unit=" + str(Unit) + ", Parameter=" + str(Command) + ", Level=" + str(Level))
 
-        if (self.unit_brightness == Unit):
+        if (self.__UNIT_BRIGHTNESS == Unit):
             if ("On" == Command):
                 self.TurnOn()
             elif ("Off" == Command):
                 self.TurnOff()
             else :
                 self.ChangeBrightness(Level,Level)
-                
-        if (self.unit_color_temperature == Unit):
+        elif (self.__UNIT_COLOR_TEMPERATURE == Unit):
             if ("On" == Command):
                 self.TurnOn()
             elif ("Off" == Command):
                 self.TurnOff()
             else :
                 self.ChangeColorTemperature(Level,Level)
-                
-        elif (self.unit_scene == Unit):
-            value = self.dict_level_scene[str(Level)]
+        elif (self.__UNIT_SCENE == Unit):
+            value = GetValueByLevel(self.__UNITS, self.__UNIT_SCENE, str(Level))
             self.ChangeScene(value, Level)
         else:
             Domoticz.Error("Unknown Unit number : " + str(Unit))
@@ -272,44 +306,14 @@ class PhilipsBulbPlugin:
         self.UpdateStatus()
         return
 
-    def ChangeBrightness(self, brightness, level):
-        result = self.miio.set_brightness(brightness)
-        Domoticz.Log("Set brightness result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.brightness = brightness
-            UpdateDevice(self.unit_brightness, 2, level)
-        else:
-            Domoticz.Log("Set brightness failure:" + str(result))
-        return
-        
-    def ChangeColorTemperature(self, color_temperature, level):
-        result = self.miio.set_color_temperature(color_temperature)
-        Domoticz.Log("Set color temperature result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.color_temperature = color_temperature
-            UpdateDevice(self.unit_color_temperature, 2, level)
-        else:
-            Domoticz.Log("Set color temperature failure:" + str(result))
-        return
-
-    def ChangeScene(self, scene, level):
-        result = self.miio.set_scene(scene)
-        Domoticz.Log("Set scene result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.scene = scene
-            UpdateDevice(self.unit_scene, 2, level)
-        else:
-            Domoticz.Log("Set scene failure:" + str(result))
-        return
-
     def TurnOn(self):
         if (self.status.is_on == False):
             result = self.miio.on()
             Domoticz.Log("Turn on result:" + str(result))
             if (result == ["ok"] or result == []):
                 self.status.is_on = True
-                UpdateDevice(self.unit_brightness, 1, "On")
-                UpdateDevice(self.unit_color_temperature, 1, "On")
+                UpdateDevice(self.__UNIT_BRIGHTNESS, 1, "On")
+                UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 1, "On")
             else:
                 Domoticz.Log("Turn on failure:" + str(result))
         return
@@ -320,10 +324,40 @@ class PhilipsBulbPlugin:
             Domoticz.Log("Turn off result:" + str(result))
             if (result == ["ok"] or result == []):
                 self.status.is_on = False
-                UpdateDevice(self.unit_brightness, 0, "Off")
-                UpdateDevice(self.unit_color_temperature, 0, "Off")
+                UpdateDevice(self.__UNIT_BRIGHTNESS, 0, "Off")
+                UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 0, "Off")
             else:
                 Domoticz.Log("Turn off failure:" + str(result))
+        return
+
+    def ChangeBrightness(self, brightness, level):
+        result = self.miio.set_brightness(brightness)
+        Domoticz.Log("Set brightness result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.brightness = brightness
+            UpdateDevice(self.__UNIT_BRIGHTNESS, 2, level)
+        else:
+            Domoticz.Log("Set brightness failure:" + str(result))
+        return
+        
+    def ChangeColorTemperature(self, color_temperature, level):
+        result = self.miio.set_color_temperature(color_temperature)
+        Domoticz.Log("Set color temperature result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.color_temperature = color_temperature
+            UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 2, level)
+        else:
+            Domoticz.Log("Set color temperature failure:" + str(result))
+        return
+
+    def ChangeScene(self, scene, level):
+        result = self.miio.set_scene(scene)
+        Domoticz.Log("Set scene result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.scene = scene
+            UpdateDevice(self.__UNIT_SCENE, 2, level)
+        else:
+            Domoticz.Log("Set scene failure:" + str(result))
         return
 
     def UpdateStatus(self):
@@ -345,30 +379,30 @@ class PhilipsBulbPlugin:
         # set device on if need
         # change image and title
         if (self.status.is_on == True):
-            UpdateDevice(self.unit_brightness, 1, "On")
-            UpdateDevice(self.unit_color_temperature, 1, "On")
-            UpdateDevice(self.unit_scene, 1, "On")
+            UpdateDevice(self.__UNIT_BRIGHTNESS, 1, "On")
+            UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 1, "On")
+            UpdateDevice(self.__UNIT_SCENE, 1, "On")
 
         # Next
         # set device level
         # change dimmer and title
         level = self.status.brightness
-        UpdateDevice(self.unit_brightness, 2, level)
+        UpdateDevice(self.__UNIT_BRIGHTNESS, 2, level)
 
         level = self.status.color_temperature
-        UpdateDevice(self.unit_color_temperature, 2, level)
+        UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 2, level)
 
         if (self.status.scene != 0):
-            level = self.getKeyByValue(self.dict_level_scene,self.status.scene)
-            UpdateDevice(self.unit_scene, 2, level)
+            level = GetLevelByValue(self.__UNITS, self.__UNIT_SCENE, self.status.scene)
+            UpdateDevice(self.__UNIT_SCENE, 2, level)
 
         # Last
         # set device off if need
         # change image and title
         if (self.status.is_on == False):
-            UpdateDevice(self.unit_brightness, 0, "Off")
-            UpdateDevice(self.unit_color_temperature, 0, "Off")
-            UpdateDevice(self.unit_scene, 0, "Off")
+            UpdateDevice(self.__UNIT_BRIGHTNESS, 0, "Off")
+            UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 0, "Off")
+            UpdateDevice(self.__UNIT_SCENE, 0, "Off")
 
         self.status = CacheStatus(self.status)
         return
@@ -433,3 +467,23 @@ def UpdateDevice(Unit, nValue, sValue):
         # and for unknown reason crash if Update methode is called whitout explicit parameters
         Devices[Unit].Update(nValue = nValue, sValue = str(sValue))
     return
+
+def GetValueByLevel(units, unit_id, level, default = 0):
+    for unit in units:
+        if unit["_Unit"] == unit_id and 'map_level_value' in unit:
+            map = unit['map_level_value']
+            return map[level]
+        elif unit["_Unit"] == unit_id and 'map_value_level' in unit:
+            map = unit['map_value_level']
+            return list(map.keys())[list(map.values()).index(level)]
+    return default
+    
+def GetLevelByValue(units, unit_id, value, default = 0):
+    for unit in units:
+        if unit["_Unit"] == unit_id and 'map_value_level' in unit:
+            map = unit['map_value_level']
+            return map[value]
+        elif unit["_Unit"] == unit_id and 'map_level_value' in unit:
+            map = unit['map_level_value']
+            return list(map.keys())[list(map.values()).index(value)]
+    return default
