@@ -1,55 +1,217 @@
-# Python Plugin for Xiaomi Philips LED Bulb
+# coding=UTF-8
+# Python Plugin for Xiaomi Miio Philips Bulb
 #
-# Author: Shainny 
+# Author: Shainny xiaoyao9184
 #
 """
-<plugin key="PhilipsBulb" name="Xiaomi Philips LED Bulb" author="Shainny" version="0.0.1" wikilink="https://github.com/Shainny/DomoticzXiaomiPlugins">
+<plugin 
+    key="Xiaomi-Miio-Philips-Bulb" 
+    name="Xiaomi Miio Philips Bulb" 
+    author="Shainny&xiaoyao9184" 
+    version="0.0.2" 
+    wikilink="https://github.com/Shainny/DomoticzXiaomiPlugins">
     <params>
-        <param field="Address" label="IP Adress" width="200px" requiered="true" default="192.168.0.0"/>
-        <param field="Password" label="Token" width="400px" requiered="true" default="ffffffffffffffffffffffffffffffff"/>
-        <param field="Mode6" label="Debug" width="75px">
+        <param field="Mode1" label="Debug" width="200px">
             <options>
-                <option label="True" value="Debug"/>
-                <option label="False" value="Normal" default="true"/>
+                <option label="None" value="none" default="none"/>
+                <option label="Debug(Only Domoticz)" value="debug"/>
+                <option label="Debug(Attach by ptvsd)" value="ptvsd"/>
+                <option label="Debug(Attach by rpdb)" value="rpdb"/>
             </options>
         </param>
+        <param field="Mode2" label="Repeat Time(s)" width="30px" required="true" default="30"/>
+        <param field="Address" label="IP" width="100px" required="true"/>
+        <param field="Mode3" label="Token" width="250px" required="true"/>
     </params>
 </plugin>
 """
 
-
-import Domoticz
 # Fix import of libs installed with pip as PluginSystem has a wierd pythonpath...
+import os
 import sys
-sys.path.append("/usr/local/lib/python%s.%s/dist-packages" % (sys.version_info.major, sys.version_info.minor))
+import site
+for mp in site.getsitepackages():
+    sys.path.append(mp)
+    
+import Domoticz
 import miio
 
 
-class BasePlugin:
+class Heartbeat():
 
-    lightUnit = 1
+    def __init__(self, interval):
+        self.callback = None
+        self.count = 0
+        # stage interval
+        self.seek = 0
+        self.interval = 10
+        # real interval
+        self.total = 10
+        if (interval < 0):
+            pass
+        elif (0 < interval and interval < 30):
+            self.interval = interval
+            self.total = interval
+        else:
+            result = self.show_factor(interval, self.filter_factor, self.bast_factor)
+            self.seek = result["repeat"]
+            self.interval = result["factor"]
+            self.total = result["number"]
 
+    def setHeartbeat(self, func_callback):
+        Domoticz.Heartbeat(self.interval)
+        Domoticz.Log("Heartbeat total interval set to: " + str(self.total) + ".")
+        self.callback = func_callback
+            
+    def beatHeartbeat(self):
+        self.count += 1
+        if (self.count >= self.seek):
+            self.count = 0
+            if self.callback is not None:
+                Domoticz.Log("Calling heartbeat handler " + str(self.callback.__name__) + ".")
+                self.callback()
+        else:
+            Domoticz.Log("Skip heartbeat handler bacause stage not enough " + str(self.count) + "/" + str(self.seek) + ".")
+
+    def filter_factor(self, factor):
+        return factor < 30 and factor > 5
+
+    def show_factor(self, number, func_filter, func_prime):
+        factor = number // 2
+        while factor > 1:
+            if number % factor == 0 and func_filter(factor):
+                return {
+                    "number": number,
+                    "factor": factor,
+                    "repeat": int(number / factor)
+                }
+            factor-=1
+        else:
+            return func_prime(number)
+
+    def next_factor(self, number):
+        return self.show_factor(number + 1, self.filter_factor, self.next_factor)
+
+    def last_factor(self, number):
+        return self.show_factor(number - 1, self.filter_factor, self.last_factor)
+
+    def bast_factor(self, number):
+        n = self.next_factor(number)
+        l = self.last_factor(number)
+
+        if n["factor"] >= l["factor"]:
+            return n
+        else:
+            return l
+
+
+class CacheStatus(object):
+    def __init__(self, status):
+      self.status = status
+      self.cache = {}
+
+    def __getattr__(self, name):
+        if name not in self.cache:
+            value = getattr(self.status, name)
+            if value is not None:
+                self.cache[name] = value
+            else:
+                return None
+        return self.cache[name]
+
+    def __setattr__(self, name, value):
+        if(name == 'status' or name == 'cache'):
+            super(CacheStatus, self).__setattr__(name, value)
+            return
+        self.cache[name] = value
+
+
+class PhilipsBulbPlugin:
+
+    unit_brightness = 1
+    unit_color_temperature = 2
+    unit_scene = 3
+
+    dict_level_scene = {'50': 0, '10': 1, '20': 2, '30': 3, '40': 4}
+
+    def getKeyByValue(self, target, value):
+        return list(target.keys())[list(target.values()).index(value)]
 
     def __init__(self):
-        self.bulb = None
+        self.miio = None
         self.status = None
-        self.heartbeatCount = 0
         return
 
 
     def onStart(self):
-        if (Parameters["Mode6"] == "Debug"):
+        # Debug
+        debug = 0
+        if (Parameters["Mode1"] != "none"):
             Domoticz.Debugging(1)
+            debug = 1
 
+        if (Parameters["Mode1"] == 'ptvsd'):
+            Domoticz.Log("Debugger ptvsd started, use 0.0.0.0:5678 to attach")
+            import ptvsd
+            # signal error on raspberry
+            ptvsd.enable_attach()
+            ptvsd.wait_for_attach()
+        elif (Parameters["Mode1"] == 'rpdb'):
+            Domoticz.Log("Debugger rpdb started, use 'telnet 127.0.0.1 4444' on host to connect")
+            import rpdb
+            rpdb.set_trace()
+            # signal error on raspberry
+            # rpdb.handle_trap("0.0.0.0", 4444)
+
+        # Heartbeat
+        self.heartbeat = Heartbeat(int(Parameters["Mode2"]))
+        self.heartbeat.setHeartbeat(self.UpdateStatus)
+
+        # Create miio
         ip = Parameters["Address"]
-        token = Parameters["Password"]
-        self.bulb = miio.PhilipsBulb(ip, token, 0, 0) # TODO Check the start_id param usage
-        Domoticz.Debug("Xiaomi Philips LED Bulb created with address '" + Parameters["Address"] + "' and token '" + token + "'")
+        token = Parameters["Mode3"]
+        self.miio = miio.philips_bulb.PhilipsBulb(ip, token, 0, debug, True)
+        Domoticz.Debug("Xiaomi Miio Philips Bulb created with address '" + ip
+            + "' and token '" + token + "'")
 
-        if (self.lightUnit not in Devices):
-            # LimitlessLights / White
+        # Add main devices
+        if (self.unit_brightness not in Devices):
+            # Selector Switch / Dimmer
             # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
-            Domoticz.Device(Name = "LED Bulb", Unit = self.lightUnit, Type = 241, Subtype = 3).Create()
+            Domoticz.Device(
+                Name = "PhilipsBulb_Brightness", 
+                Unit = self.unit_brightness, 
+                # Type = 241, 
+                # Subtype = 8,
+                TypeName = "Selector Switch", 
+                Switchtype = 7).Create()
+
+        if (self.unit_color_temperature not in Devices):
+            # Selector Switch / Dimmer
+            # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
+            Domoticz.Device(
+                Name = "PhilipsBulb_Color_Temperature", 
+                Unit = self.unit_color_temperature, 
+                # Type = 241, 
+                # Subtype = 8,
+                TypeName = "Selector Switch", 
+                Switchtype = 7).Create()
+
+        # Add scene device
+        Options =   {    
+            "LevelActions"  :"|||||" , 
+            "LevelNames"    :"None|Bright|TV|Warm|Night" ,
+            "LevelOffHidden":"true",
+            "SelectorStyle" :"0"
+        }
+        if (self.unit_scene not in Devices):
+            # Selector Switch / Selector
+            Domoticz.Device(
+                Name = "PhilipsBulb_Scene", 
+                Unit = self.unit_scene, 
+                TypeName = "Selector Switch", 
+                Switchtype = 18, 
+                Options = Options).Create()
 
         # Read initial state
         self.UpdateStatus()
@@ -70,31 +232,6 @@ class BasePlugin:
         Domoticz.Debug("onMessage called: Connection=" + str(Connection) + ", Data=" + str(Data))
         return
 
-    def onCommand(self, Unit, Command, Level, Hue):
-        Domoticz.Debug("onCommand called: Unit=" + str(Unit) + ", Parameter=" + str(Command) + ", Level=" + str(Level))
-
-        if (self.lightUnit == Unit):
-            if ("On" == Command):
-                self.TurnOn()
-            elif ("Off" == Command):
-                self.TurnOff()
-            elif ("Bright Up" == Command):
-                # TODO
-                pass
-            elif ("Bright Down" == Command):
-                # TODO
-                pass
-            elif ("Warmer" == Command):
-                # TODO
-                pass
-            elif ("Cooler" == Command):
-                # TODO
-                pass
-        else:
-            Domoticz.Error("Unknown Unit number : " + str(Unit))
-
-        return
-
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
         Domoticz.Debug("Notification: " + Name + "," + Subject + "," + Text + "," + Status + "," + str(Priority) + "," + Sound + "," + ImageFile)
         return
@@ -104,43 +241,141 @@ class BasePlugin:
         return
 
     def onHeartbeat(self):
-        self.heartbeatCount += 1
-        if (self.heartbeatCount == 10): # Each minute
-            self.UpdateStatus()
-            self.heartbeatCount = 0
+        self.heartbeat.beatHeartbeat()
+        
+    def onCommand(self, Unit, Command, Level, Hue):
+        Domoticz.Debug("onCommand called: Unit=" + str(Unit) + ", Parameter=" + str(Command) + ", Level=" + str(Level))
+
+        if (self.unit_brightness == Unit):
+            if ("On" == Command):
+                self.TurnOn()
+            elif ("Off" == Command):
+                self.TurnOff()
+            else :
+                self.ChangeBrightness(Level,Level)
+                
+        if (self.unit_color_temperature == Unit):
+            if ("On" == Command):
+                self.TurnOn()
+            elif ("Off" == Command):
+                self.TurnOff()
+            else :
+                self.ChangeColorTemperature(Level,Level)
+                
+        elif (self.unit_scene == Unit):
+            value = self.dict_level_scene[str(Level)]
+            self.ChangeScene(value, Level)
+        else:
+            Domoticz.Error("Unknown Unit number : " + str(Unit))
+
+        # update status
+        self.UpdateStatus()
+        return
+
+    def ChangeBrightness(self, brightness, level):
+        result = self.miio.set_brightness(brightness)
+        Domoticz.Log("Set brightness result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.brightness = brightness
+            UpdateDevice(self.unit_brightness, 2, level)
+        else:
+            Domoticz.Log("Set brightness failure:" + str(result))
+        return
+        
+    def ChangeColorTemperature(self, color_temperature, level):
+        result = self.miio.set_color_temperature(color_temperature)
+        Domoticz.Log("Set color temperature result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.color_temperature = color_temperature
+            UpdateDevice(self.unit_color_temperature, 2, level)
+        else:
+            Domoticz.Log("Set color temperature failure:" + str(result))
+        return
+
+    def ChangeScene(self, scene, level):
+        result = self.miio.set_scene(scene)
+        Domoticz.Log("Set scene result:" + str(result))
+        if (result == ["ok"] or result == []):
+            self.status.scene = scene
+            UpdateDevice(self.unit_scene, 2, level)
+        else:
+            Domoticz.Log("Set scene failure:" + str(result))
         return
 
     def TurnOn(self):
         if (self.status.is_on == False):
-            if (self.bulb.on() == ["ok"]):
+            result = self.miio.on()
+            Domoticz.Log("Turn on result:" + str(result))
+            if (result == ["ok"] or result == []):
                 self.status.is_on = True
-                UpdateDevice(self.lightUnit, 1, "On")
+                UpdateDevice(self.unit_brightness, 1, "On")
+                UpdateDevice(self.unit_color_temperature, 1, "On")
+            else:
+                Domoticz.Log("Turn on failure:" + str(result))
         return
 
     def TurnOff(self):
         if (self.status.is_on == True):
-            if (self.bulb.off() == ["ok"]):
+            result = self.miio.off()
+            Domoticz.Log("Turn off result:" + str(result))
+            if (result == ["ok"] or result == []):
                 self.status.is_on = False
-                UpdateDevice(self.lightUnit, 0, "Off")
+                UpdateDevice(self.unit_brightness, 0, "Off")
+                UpdateDevice(self.unit_color_temperature, 0, "Off")
+            else:
+                Domoticz.Log("Turn off failure:" + str(result))
         return
 
     def UpdateStatus(self):
-        self.status = self.bulb.status()
+        if not hasattr(self, 'miio'):
+            return
+        self.status = self.miio.status()
         Domoticz.Debug("Status : On = " + str(self.status.is_on) + \
                               ", Brightness = " + str(self.status.brightness) + \
                               ", ColorTemp = " + str(self.status.color_temperature) + \
                               ", DelayOff = " + str(self.status.delay_off_countdown) + \
-                              ", Power = " + str(self.status.power))
+                              ", Power = " + str(self.status.power) + \
+                              ", Scene = " + str(self.status.scene))
 
+        # MUSE THIS ORDER
+        # on image with level title
+        # off image with 'Off' title
+
+        # First 
+        # set device on if need
+        # change image and title
         if (self.status.is_on == True):
-            UpdateDevice(self.lightUnit, 1, "On")
-        else:
-            UpdateDevice(self.lightUnit, 0, "Off")
+            UpdateDevice(self.unit_brightness, 1, "On")
+            UpdateDevice(self.unit_color_temperature, 1, "On")
+            UpdateDevice(self.unit_scene, 1, "On")
 
+        # Next
+        # set device level
+        # change dimmer and title
+        level = self.status.brightness
+        UpdateDevice(self.unit_brightness, 2, level)
+
+        level = self.status.color_temperature
+        UpdateDevice(self.unit_color_temperature, 2, level)
+
+        if (self.status.scene != 0):
+            level = self.getKeyByValue(self.dict_level_scene,self.status.scene)
+            UpdateDevice(self.unit_scene, 2, level)
+
+        # Last
+        # set device off if need
+        # change image and title
+        if (self.status.is_on == False):
+            UpdateDevice(self.unit_brightness, 0, "Off")
+            UpdateDevice(self.unit_color_temperature, 0, "Off")
+            UpdateDevice(self.unit_scene, 0, "Off")
+
+        self.status = CacheStatus(self.status)
         return
 
+
 global _plugin
-_plugin = BasePlugin()
+_plugin = PhilipsBulbPlugin()
 
 def onStart():
     global _plugin
@@ -176,15 +411,6 @@ def onHeartbeat():
 
 # Generic helper functions
 
-def UpdateDevice(Unit, nValue, sValue):
-    if (Unit not in Devices): return
-    if (Devices[Unit].nValue != nValue) or (Devices[Unit].sValue != sValue):
-        Domoticz.Debug("Update '" + Devices[Unit].Name + "' : " + str(nValue) + " - " + str(sValue))
-        # Warning: The lastest beta does not completly support python 3.5
-        # and for unknown reason crash if Update methode is called whitout explicit parameters
-        Devices[Unit].Update(nValue = nValue, sValue = str(sValue))
-    return
-
 def DumpConfigToLog():
     for x in Parameters:
         if Parameters[x] != "":
@@ -197,4 +423,13 @@ def DumpConfigToLog():
         Domoticz.Debug("Device nValue:    " + str(Devices[x].nValue))
         Domoticz.Debug("Device sValue:   '" + Devices[x].sValue + "'")
         Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
+    return
+
+def UpdateDevice(Unit, nValue, sValue):
+    if (Unit not in Devices): return
+    if (Devices[Unit].nValue != nValue) or (Devices[Unit].sValue != sValue):
+        Domoticz.Debug("Update '" + Devices[Unit].Name + "' : " + str(nValue) + " - " + str(sValue))
+        # Warning: The lastest beta does not completly support python 3.5
+        # and for unknown reason crash if Update methode is called whitout explicit parameters
+        Devices[Unit].Update(nValue = nValue, sValue = str(sValue))
     return
