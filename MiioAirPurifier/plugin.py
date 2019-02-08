@@ -584,12 +584,12 @@ class AirPurifierPlugin:
             },
             "bindingStatusField": "led_brightness",
             "mapStatus": MapEnumStatus,
-            "map_status_value": { "Off": 2, "Dim": 2, "Bright": 2 }, 
-            "map_status_text": { "Off": "0", "Dim": "10", "Bright": "20"},
+            "map_status_value": { miio.airpurifier.LedBrightness.Off: 2, miio.airpurifier.LedBrightness.Dim: 2, miio.airpurifier.LedBrightness.Bright: 2 }, 
+            "map_status_text": { miio.airpurifier.LedBrightness.Off: "0", miio.airpurifier.LedBrightness.Dim: "10", miio.airpurifier.LedBrightness.Bright: "20"},
             "mapCommand": MapEnumLevelToMethodParam,
-            "map_level_status": { 0: "Off", 10: "Dim", 20: "Bright" },
+            "map_level_status": { 0: miio.airpurifier.LedBrightness.Off, 10: miio.airpurifier.LedBrightness.Dim, 20: miio.airpurifier.LedBrightness.Bright },
             "map_level_method": "miio.set_led_brightness",
-            "map_level_param": { 0: "Off", 10: "Dim", 20: "Bright" }
+            "map_level_param": { 0: miio.airpurifier.LedBrightness.Off, 10: miio.airpurifier.LedBrightness.Dim, 20: miio.airpurifier.LedBrightness.Bright }
         },
         {
             "_Name": "AirPurifier_Mode", 
@@ -604,12 +604,40 @@ class AirPurifierPlugin:
             },
             "bindingStatusField": "mode",
             "mapStatus": MapEnumStatus,
-            "map_status_value": { "None": 2, "Auto": 2, "Favorite": 2 , "High": 2 , "Idle": 2 , "Medium": 2 , "Silent": 2 , "Strong": 2 }, 
-            "map_status_text": { "None": "0", "Auto": "10", "Favorite": "20", "High": "30", "Idle": "40", "Medium": "50", "Silent": "60", "Strong": "70"},
+            "map_status_value": { 
+                miio.airpurifier.OperationMode.Auto: 2, 
+                miio.airpurifier.OperationMode.Favorite: 2, 
+                miio.airpurifier.OperationMode.High: 2, 
+                miio.airpurifier.OperationMode.Idle: 2, 
+                miio.airpurifier.OperationMode.Medium: 2, 
+                miio.airpurifier.OperationMode.Silent: 2,
+                miio.airpurifier.OperationMode.Strong: 2 }, 
+            "map_status_text": { 
+                miio.airpurifier.OperationMode.Auto: "10", 
+                miio.airpurifier.OperationMode.Favorite: "20", 
+                miio.airpurifier.OperationMode.High: "30", 
+                miio.airpurifier.OperationMode.Idle: "40", 
+                miio.airpurifier.OperationMode.Medium: "50", 
+                miio.airpurifier.OperationMode.Silent: "60", 
+                miio.airpurifier.OperationMode.Strong: "70" },
             "mapCommand": MapEnumLevelToMethodParam,
-            "map_level_status": { 10: "Auto", 20: "Favorite", 30: "High", 40: "Idle", 50: "Medium", 60: "Silent", 70: "Strong" },
+            "map_level_status": { 
+                10: miio.airpurifier.OperationMode.Auto, 
+                20: miio.airpurifier.OperationMode.Favorite, 
+                30: miio.airpurifier.OperationMode.High, 
+                40: miio.airpurifier.OperationMode.Idle, 
+                50: miio.airpurifier.OperationMode.Medium, 
+                60: miio.airpurifier.OperationMode.Silent, 
+                70: miio.airpurifier.OperationMode.Strong },
             "map_level_method": "miio.set_mode",
-            "map_level_param": { 10: "Auto", 20: "Favorite", 30: "High", 40: "Idle", 50: "Medium", 60: "Silent", 70: "Strong" }
+            "map_level_param": { 
+                10: miio.airpurifier.OperationMode.Auto, 
+                20: miio.airpurifier.OperationMode.Favorite, 
+                30: miio.airpurifier.OperationMode.High, 
+                40: miio.airpurifier.OperationMode.Idle, 
+                50: miio.airpurifier.OperationMode.Medium, 
+                60: miio.airpurifier.OperationMode.Silent, 
+                70: miio.airpurifier.OperationMode.Strong }
         },
         {
             "_Name": "AirPurifier_Volume", 
