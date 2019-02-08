@@ -42,6 +42,8 @@ for mp in site.getsitepackages():
 
 import Domoticz
 import miio
+import functools
+import time
 
 
 class Heartbeat():
@@ -132,24 +134,338 @@ class CacheStatus(object):
             return
         self.cache[name] = value
 
+    def toString(self):
+        l = []
+        for attr in dir(self.status):
+            if(attr[:2] != "__" and attr != 'data'):
+                value = getattr(self.status, attr)
+                l.append(str(attr + ' = ' + str(value)) )
+        return ', '.join(l)
+
 
 class PowerStripPlugin:
 
-    unit_main = 1
-    unit_temp = 2
-    unit_mode = 3
-    unit_current = 4
-    unit_leakage_current = 5
-    unit_load = 6
-    unit_power_factor = 7
-    unit_power_price = 8
-    unit_voltage = 9
-    unit_led = 10
+    def MapEnumStatus(self, unit, status):
+        value = None
+        text = None
+        if "map_status_value" in unit.keys():
+            value = unit["map_status_value"][status]
+        else:
+            value = status
+
+        if "map_status_text" in unit.keys():
+            text = unit["map_status_text"][status]
+        else:
+            text = status
+
+        return {
+            "value": value,
+            "text": text
+        }
+
+    def MapStatus(self, unit, status):
+        value = None
+        text = None
+        if "map_status_value" in unit.keys():
+            mapStatusValue = unit["map_status_value"]
+            if mapStatusValue == None:
+                value = status
+            elif type(mapStatusValue) is int:
+                value = mapStatusValue
+            else:
+                value = mapStatusValue(self, unit, status)
+        else:
+            value = status
+
+        if "map_status_text" in unit.keys():
+            mapStatusText = unit["map_status_text"]
+            if mapStatusText == None:
+                text = str(status)
+            elif type(mapStatusText) is str:
+                text = mapStatusText
+            elif type(mapStatusText) is dict:
+                text = unit["map_status_text"][status]
+            else:
+                text = mapStatusText(self, unit, status)
+        else:
+            text = status
+
+        return {
+            "value": value,
+            "text": text
+        }
+
+    def MapEnumCommandToMethod(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_command_status"][command]
+
+        if status_old == status_new:
+            Domoticz.Log("The command is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_command_method"][command]
+        method = rgetattr(self, method)
+        result = method()
+
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapEnumCommandToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_command_status"][command]
+
+        if status_old == status_new:
+            Domoticz.Log("The command is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_command_method"]
+        method = rgetattr(self, method)
+        param = unit["map_command_method_param"][command]
+
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return
+
+    def MapEnumLevelToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_level_status"][level]
+
+        if status_old == status_new:
+            Domoticz.Log("The level is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_level_method"]
+        method = rgetattr(self, method)
+        param = unit["map_level_param"][level]
+        
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapLevelToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = level
+
+        mapLevelStatus = unit["map_level_status"]
+        if mapLevelStatus != None:
+            status_new = mapLevelStatus(self, unit, level)
+            if status_new == status_old:
+                Domoticz.Log("The command is consistent with the status:" + str(command))
+                return None
+
+        method = unit["map_level_method"]
+        method = rgetattr(self, method)
+        param = level
+        mapLevelParam = unit["map_level_param"]
+        if mapLevelParam != None:
+            param = mapLevelParam(self, unit, level)
+
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapStatusToWattText(self, unit, status):
+        # https://www.domoticz.com/forum/viewtopic.php?t=21978
+        # https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Electricity_.28instant_and_counter.29
+        avg = (self.lastWatt + status) / 2
+        second = int(time.time()) - self.lastTime
+
+        self.lastWatt = status
+        self.lastTime = int(time.time())
+        self.lastCount = self.lastCount + (avg / 1000) * (second / 60 / 60)
+        return str(status) + ";" + "{:.9f}".format(self.lastCount)
+
+    __UNIT_POWER = 1
+    __UNIT_TEMPERATURE = 2
+    __UNIT_ELECTRIC = 3
+    __UNIT_VLOTAGE = 4
+    __UNIT_POWER_FACTOR = 5
+    __UNIT_POWER_PRICE = 6
+    __UNIT_CURRENT = 7
+    __UNIT_LEAKAGE_CURRENT = 8
+    __UNIT_MODE = 9
+    # __UNIT_REALTIME_POWER = 10
+    __UNIT_LED = 11
+    
+    __UNITS = [
+        {
+            "_Name": "PowerStrip_Power", 
+            "_Unit": __UNIT_POWER, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 1,
+            "bindingStatusField": "is_on",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { True: 1, False: 0 }, 
+            "map_status_text": { True: "On", False: "Off" },
+            "mapCommand": MapEnumCommandToMethod,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": {
+                "On": "miio.on",
+                "Off": "miio.off"
+            }
+        },
+        {
+            "_Name": "PowerStrip_Temperature", 
+            "_Unit": __UNIT_TEMPERATURE, 
+            "_TypeName": "Temperature",
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "temperature"
+        },
+        {
+            "_Name": "PowerStrip_Electric", 
+            "_Unit": __UNIT_ELECTRIC, 
+            "_TypeName": "kWh",
+            # General / kWh
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "load_power",
+            "mapStatus": MapStatus,
+            "map_status_value": 0, 
+            "map_status_text": MapStatusToWattText,
+        },
+        {
+            "_Name": "PowerStrip_Voltage", 
+            "_Unit": __UNIT_VLOTAGE, 
+            "_TypeName": "Voltage",
+            # General / Voltage
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "voltage",
+            "mapStatus": MapStatus,
+            "map_status_value": 0, 
+            "map_status_text": None, 
+        },
+        {
+            "_Name": "PowerStrip_Power_Factor", 
+            "_Unit": __UNIT_POWER_FACTOR, 
+            "_TypeName": "Custom",
+            "_Options": {
+                "Custom": "0;"
+            },
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "power_factor",
+        },
+        {
+            "_Name": "PowerStrip_Power_Price", 
+            "_Unit": __UNIT_POWER_PRICE, 
+            "_TypeName": "Custom",
+            "_Options": {
+                "Custom": "0;"
+            },
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "power_price",
+        },
+        {
+            "_Name": "PowerStrip_Current", 
+            "_Unit": __UNIT_CURRENT, 
+            "_TypeName": "Custom",
+            "_Options": {
+                "Custom": "0;"
+            },
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "current",
+        },
+        {
+            "_Name": "PowerStrip_Leakage_Current", 
+            "_Unit": __UNIT_LEAKAGE_CURRENT, 
+            "_TypeName": "Custom",
+            "_Options": {
+                "Custom": "0;"
+            },
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "leakage_current",
+        },
+        {
+            "_Name": "PowerStrip_Mode", 
+            "_Unit": __UNIT_MODE, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 9,
+            "bindingStatusField": "mode",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { miio.powerstrip.PowerMode.Eco: 1, miio.powerstrip.PowerMode.Normal: 0 }, 
+            "map_status_text": { miio.powerstrip.PowerMode.Eco: "On", miio.powerstrip.PowerMode.Normal: "Off" },
+            "mapCommand": MapEnumCommandToMethodParam,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": "set_power_mode",
+            "map_command_method_param": { "On": miio.powerstrip.PowerMode.Eco, "Off": miio.powerstrip.PowerMode.Normal }
+        },
+        # I don't know which state is related to set_realtime_power.
+        # {
+        #     "_Name": "PowerStrip_Realtime_Power", 
+        #     "_Unit": __UNIT_REALTIME_POWER, 
+        #     "_TypeName": "Selector Switch", 
+        #     # Selector Switch / On/Off
+        #     "_Switchtype": 0,
+        #     "_Options": None,
+        #     "_Image": 0,
+        #     "bindingStatusField": "?",
+        #     "mapStatus": MapEnumStatus,
+        #     "map_status_value": { True: 1, False: 0 }, 
+        #     "map_status_text": { True: "On", False: "Off" },
+        #     "mapCommand": MapEnumCommandToMethodParam,
+        #     "map_command_status": { "On": True, "Off": False },
+        #     "map_command_method": "miio.set_realtime_power",
+        #     "map_command_method_param": { "On": True, "Off": False }
+        # },
+        {
+            "_Name": "PowerStrip_LED", 
+            "_Unit": __UNIT_LED, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 0,
+            "bindingStatusField": "wifi_led",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { True: 1, False: 0 }, 
+            "map_status_text": { True: "On", False: "Off" },
+            "mapCommand": MapEnumCommandToMethodParam,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": "miio.set_wifi_led",
+            "map_command_method_param": { "On": True, "Off": False }
+        }
+    ]
 
     def __init__(self):
         self.miio = None
         self.status = None
-        self.heartbeatCount = 0
+        self.lastWatt = 0
+        self.lastCount = 0
+        self.lastTime = int(time.time())
         return
 
     def onStart(self):
@@ -159,13 +475,13 @@ class PowerStripPlugin:
             Domoticz.Debugging(1)
             debug = 1
         
-        if (Parameters["Mode1"] == 'ptvsd'):
+        if (Parameters["Mode1"] == "ptvsd"):
             Domoticz.Log("Debugger ptvsd started, use 0.0.0.0:5678 to attach")
             import ptvsd
             # signal error on raspberry
             ptvsd.enable_attach()
             ptvsd.wait_for_attach()
-        elif (Parameters["Mode1"] == 'rpdb'):
+        elif (Parameters["Mode1"] == "rpdb"):
             Domoticz.Log("Debugger rpdb started, use 'telnet 0.0.0.0 4444' to connect")
             import rpdb
             rpdb.set_trace()
@@ -189,94 +505,32 @@ class PowerStripPlugin:
         if (price != ''):
             self.miio.set_power_price(int(price))
 
-        # Add main devices
-        if (self.unit_main not in Devices):
-            # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
-            Domoticz.Device(
-                Name = "PowerStrip", 
-                Unit = self.unit_main, 
-                Type = 244, 
-                Subtype = 62,
-                Image = 1).Create()
-        if (self.unit_temp not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip temperature", 
-                Unit = self.unit_temp, 
-                Type = 80, 
-                Subtype = 5).Create()
-        
-        # Read function
+         # Read function
         self.UpdateStatus(False)
 
-        # Add optional devices
-        if (self.status.voltage is not None 
-            and self.unit_voltage not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip voltage", 
-                Unit = self.unit_voltage, 
-                Type = 243, 
-                Subtype = 8).Create()
-        if (self.status.load_power is not None 
-            and self.unit_load not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip electric", 
-                Unit = self.unit_load, 
-                Type = 243, 
-                Subtype = 29).Create()
-        
-        # unknow device
-        if (self.status.power_factor is not None 
-            and self.unit_power_factor not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip power factor", 
-                Unit = self.unit_power_factor, 
-                Type = 243, 
-                Subtype = 31,
-                Options = {"Custom": "0;"}).Create()
-        if (self.status.power_price is not None 
-            and self.unit_power_price not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip power price", 
-                Unit = self.unit_power_price, 
-                Type = 243, 
-                Subtype = 31,
-                Options = {"Custom": "0;"}).Create()
-        if (self.status.current is not None 
-            and self.unit_current not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip current", 
-                Unit = self.unit_current, 
-                Type = 243, 
-                Subtype = 31,
-                Options = {"Custom": "0;"}).Create()
-        if (self.status.leakage_current is not None 
-            and self.unit_leakage_current not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip leakage current", 
-                Unit = self.unit_leakage_current, 
-                Type = 243, 
-                Subtype = 31,
-                Options = {"Custom": "0;"}).Create()
-        
-        if (self.status.mode is not None 
-            and self.unit_mode not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip mode", 
-                Unit = self.unit_mode, 
-                Type = 244, 
-                Subtype = 62,
-                Image = 9).Create()
-        if (self.status.wifi_led is not None 
-            and self.unit_led not in Devices):
-            Domoticz.Device(
-                Name = "PowerStrip led", 
-                Unit = self.unit_led, 
-                Type = 244, 
-                Subtype = 62).Create()
+        # Create devices
+        for unit in self.__UNITS:
+            field = unit["bindingStatusField"]
+            value = getattr(self.status, field)
+            if value is not None and unit["_Unit"] not in Devices:
+                if "_Switchtype" in unit and unit["_Switchtype"] != None:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Switchtype = unit["_Switchtype"],
+                        Image = unit["_Image"],
+                        Options = unit["_Options"]).Create()
+                else:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Options = unit["_Options"]).Create()
 
         # Read initial state
         self.UpdateStatus()
-
+        
         DumpConfigToLog()
 
         return
@@ -296,26 +550,16 @@ class PowerStripPlugin:
     def onCommand(self, Unit, Command, Level, Hue):
         Domoticz.Debug("onCommand called: Unit=" + str(Unit) + ", Parameter=" + str(Command) + ", Level=" + str(Level))
 
-        if (self.unit_main == Unit):
-            if ("On" == Command):
-                self.TurnOn()
-            elif ("Off" == Command):
-                self.TurnOff()
-        elif (self.unit_mode == Unit):
-            if ("On" == Command):
-                self.TurnModeEco()
-            elif ("Off" == Command):
-                self.TurnModeNormal()
-        elif (self.unit_led == Unit):
-            if ("On" == Command):
-                self.TurnOnWifiLed()
-            elif ("Off" == Command):
-                self.TurnOffWifiLed()
-        else:
-            Domoticz.Error("Unknown Unit number : " + str(Unit))
-
-        # update status
-        self.UpdateStatus()
+        unit = FindUnit(self.__UNITS, Unit)
+        if unit is not None and "mapCommand" in unit.keys():
+            status = unit["mapCommand"](self, unit, Command, Level)
+            if status != None:
+                # Update device
+                field = unit["bindingStatusField"]
+                setattr(self.status, field, status)
+                vt = unit["mapStatus"](self, unit, status)
+                UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
+            return
         return
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
@@ -332,149 +576,27 @@ class PowerStripPlugin:
 
 
     def UpdateStatus(self, updateDevice = True):
-        if not hasattr(self, 'miio'):
+        if not hasattr(self, "miio"):
             return
         self.status = self.miio.status()
-        log = "Status : On = " + str(self.status.is_on) + \
-                ", Power = " + str(self.status.power) + \
-                ", Temperature = " + str(self.status.temperature)
-        if(self.status,'load_power'):
-            log = log + ", Load Power = " + str(self.status.load_power)
-        if(self.status.wifi_led):
-            log = log + ", Wifi Led = " + str(self.status.wifi_led)
-
-        Domoticz.Debug(log)
-
-        if (not updateDevice):
-            self.status = CacheStatus(self.status)
-            return
-
-        if (self.status.is_on == True):
-            UpdateDevice(self.unit_main, 1, "On")
-        else:
-            UpdateDevice(self.unit_main, 0, "Off")
-
-        if (self.status.mode == miio.powerstrip.PowerMode.Eco):
-            UpdateDevice(self.unit_mode, 1, "On")
-        elif (self.status.mode == miio.powerstrip.PowerMode.Normal):
-            UpdateDevice(self.unit_mode, 0, "Off")
-
-        if (self.status.wifi_led == True):
-            UpdateDevice(self.unit_led, 1, "On")
-        elif (self.status.wifi_led == False):
-            UpdateDevice(self.unit_led, 0, "Off")
-
-        if (self.status.temperature is not None):
-            UpdateDevice(self.unit_temp, self.status.temperature, str(self.status.temperature))
-        if (self.status.voltage is not None):
-            UpdateDevice(self.unit_voltage, 0, str(self.status.voltage))
-        if (self.status.load_power is not None):
-            # https://www.domoticz.com/forum/viewtopic.php?t=21978
-            # https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Electricity_.28instant_and_counter.29
-            UpdateDevice(self.unit_load, 0, str(self.status.load_power) + ';0.000')
-            
-        if (self.status.power_factor is not None):
-            UpdateDevice(self.unit_power_factor, self.status.power_factor, str(self.status.power_factor))
-        if (self.status.power_price is not None):
-            UpdateDevice(self.unit_power_price, self.status.power_price, str(self.status.power_price))
-        if (self.status.current is not None):
-            UpdateDevice(self.unit_current, self.status.current, str(self.status.current))
-        if (self.status.leakage_current is not None):
-            UpdateDevice(self.unit_leakage_current, self.status.leakage_current, str(self.status.leakage_current))
-        
-
         self.status = CacheStatus(self.status)
+        log = "Status : " + self.status.toString()
+        Domoticz.Debug(log)
+        
+        # Update devices
+        if (updateDevice):
+            for unit in self.__UNITS:
+                field = unit["bindingStatusField"]
+                status = getattr(self.status, field)
+                if status is None:
+                    pass
+                elif "mapStatus" in unit.keys():
+                    vt = unit["mapStatus"](self, unit, status)
+                    UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
+                else:
+                    UpdateDevice(unit["_Unit"], status, str(status))
         return
 
-    def TurnOn(self):
-        if (self.status.is_on == False):
-            result = self.miio.on()
-            Domoticz.Log("Turn on result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = True
-                UpdateDevice(self.unit_main, 1, "On")
-            else:
-                Domoticz.Log("Turn on failure:" + str(result))
-        return
-
-    def TurnOff(self):
-        if (self.status.is_on == True):
-            result = self.miio.off()
-            Domoticz.Log("Turn off result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = False
-                UpdateDevice(self.unit_main, 0, "Off")
-            else:
-                Domoticz.Log("Turn off failure:" + str(result))
-        return
-
-    def TurnModeEco(self):
-        if (self.status.mode == miio.powerstrip.PowerMode.Normal):
-            result = self.miio.set_power_mode(miio.powerstrip.PowerMode.Eco)
-            Domoticz.Log("Turn mode to result:" + str(result))
-            if (result == ["ok"]):
-                self.status.mode = miio.powerstrip.PowerMode.Eco
-                UpdateDevice(self.unit_mode, 1, "On")
-            else:
-                Domoticz.Log("Turn mode to 'Eco' failure:" + str(result))
-        return
-
-    def TurnModeNormal(self):
-        if (self.status.mode == miio.powerstrip.PowerMode.Eco):
-            result = self.miio.set_power_mode(miio.powerstrip.PowerMode.Normal)
-            Domoticz.Log("Turn mode to result:" + str(result))
-            if (result == ["ok"]):
-                self.status.mode = miio.powerstrip.PowerMode.Normal
-                UpdateDevice(self.unit_mode, 0, "Off")
-            else:
-                Domoticz.Log("Turn mode to 'Normal' failure:" + str(result))
-        return
-
-    # I don't know which state is related to set_realtime_power.
-    #
-    # def TurnOnRealtimePower(self):
-    #     if (self.status.power_factor == False):
-    #         result = self.miio.set_realtime_power(True)
-    #         Domoticz.Log("Turn realtime power on result:" + str(result))
-    #         if (result == ["ok"]):
-    #             self.status.power_factor = True
-    #             UpdateDevice(self.unit_?, 1, "On")
-    #         else:
-    #             Domoticz.Log("Turn realtime power off failure:" + str(result))
-    #     return
-
-    # def TurnOffRealtimePower(self):
-    #     if (self.status.power_factor == True):
-    #         result = self.miio.set_realtime_power(False)
-    #         Domoticz.Log("Turn realtime power off result:" + str(result))
-    #         if (result == ["ok"]):
-    #             self.status.power_factor = False
-    #             UpdateDevice(self.unit_?, 0, "Off")
-    #         else:
-    #             Domoticz.Log("Turn realtime power off failure:" + str(result))
-    #     return
-
-    def TurnOnWifiLed(self):
-        if (self.status.wifi_led == False):
-            result = self.miio.set_wifi_led(True)
-            Domoticz.Log("Turn led on result:" + str(result))
-            if (result == ["ok"]):
-                self.status.wifi_led = True
-                UpdateDevice(self.unit_led, 1, "On")
-            else:
-                Domoticz.Log("Turn usb off failure:" + str(result))
-        return
-
-    def TurnOffWifiLed(self):
-        if (self.status.wifi_led == True):
-            result = self.miio.set_wifi_led(False)
-            Domoticz.Log("Turn led off result:" + str(result))
-            if (result == ["ok"]):
-                self.status.wifi_led = False
-                UpdateDevice(self.unit_led, 0, "Off")
-            else:
-                Domoticz.Log("Turn usb off failure:" + str(result))
-        return
 
 global _plugin
 _plugin = PowerStripPlugin()
@@ -511,6 +633,9 @@ def onHeartbeat():
     global _plugin
     _plugin.onHeartbeat()
 
+
+# Generic helper functions
+
 def DumpConfigToLog():
     for x in Parameters:
         if Parameters[x] != "":
@@ -525,10 +650,6 @@ def DumpConfigToLog():
         Domoticz.Debug("Device LastLevel: " + str(Devices[x].LastLevel))
     return
 
-    
-
-# Generic helper functions
-
 def UpdateDevice(Unit, nValue, sValue):
     if (Unit not in Devices): return
     if (Devices[Unit].nValue != nValue) or (Devices[Unit].sValue != sValue):
@@ -537,3 +658,20 @@ def UpdateDevice(Unit, nValue, sValue):
         # and for unknown reason crash if Update methode is called whitout explicit parameters
         Devices[Unit].Update(nValue = nValue, sValue = str(sValue))
     return
+
+def FindUnit(Units, unit):
+    for item in Units:
+        if item["_Unit"] == unit:
+            return item
+    return None
+
+def rsetattr(obj, attr, val):
+    pre, _, post = attr.rpartition('.')
+    return setattr(rgetattr(obj, pre) if pre else obj, post, val)
+
+# using wonder's beautiful simplification: https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-objects/31174427?noredirect=1#comment86638618_31174427
+
+def rgetattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+    return functools.reduce(_getattr, [obj] + attr.split('.'))

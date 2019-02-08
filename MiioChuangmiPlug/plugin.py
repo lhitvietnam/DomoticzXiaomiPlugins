@@ -43,6 +43,8 @@ for mp in site.getsitepackages():
 
 import Domoticz
 import miio
+import functools
+import time
 
 
 class Heartbeat():
@@ -133,18 +135,255 @@ class CacheStatus(object):
             return
         self.cache[name] = value
 
+    def toString(self):
+        l = []
+        for attr in dir(self.status):
+            if(attr[:2] != "__" and attr != 'data'):
+                value = getattr(self.status, attr)
+                l.append(str(attr + ' = ' + str(value)) )
+        return ', '.join(l)
+
 
 class ChuangmiPlugPlugin:
 
-    unit_main = 1
-    unit_temp = 2
-    unit_load = 3
-    unit_usb = 4
-    unit_led = 5
+    def MapEnumStatus(self, unit, status):
+        value = None
+        text = None
+        if "map_status_value" in unit.keys():
+            value = unit["map_status_value"][status]
+        else:
+            value = status
+
+        if "map_status_text" in unit.keys():
+            text = unit["map_status_text"][status]
+        else:
+            text = status
+
+        return {
+            "value": value,
+            "text": text
+        }
+
+    def MapStatus(self, unit, status):
+        value = None
+        text = None
+        if "map_status_value" in unit.keys():
+            mapStatusValue = unit["map_status_value"]
+            if mapStatusValue == None:
+                value = status
+            elif type(mapStatusValue) is int:
+                value = mapStatusValue
+            else:
+                value = mapStatusValue(self, unit, status)
+        else:
+            value = status
+
+        if "map_status_text" in unit.keys():
+            mapStatusText = unit["map_status_text"]
+            if mapStatusText == None:
+                text = str(status)
+            elif type(mapStatusText) is str:
+                text = mapStatusText
+            elif type(mapStatusText) is dict:
+                text = unit["map_status_text"][status]
+            else:
+                text = mapStatusText(self, unit, status)
+        else:
+            text = status
+
+        return {
+            "value": value,
+            "text": text
+        }
+
+    def MapEnumCommandToMethod(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_command_status"][command]
+
+        if status_old == status_new:
+            Domoticz.Log("The command is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_command_method"][command]
+        method = rgetattr(self, method)
+        result = method()
+
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapEnumCommandToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_command_status"][command]
+
+        if status_old == status_new:
+            Domoticz.Log("The command is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_command_method"]
+        method = rgetattr(self, method)
+        param = unit["map_command_method_param"][command]
+
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return
+
+    def MapEnumLevelToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = unit["map_level_status"][level]
+
+        if status_old == status_new:
+            Domoticz.Log("The level is consistent with the status:" + str(command))
+            return None
+
+        method = unit["map_level_method"]
+        method = rgetattr(self, method)
+        param = unit["map_level_param"][level]
+        
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapLevelToMethodParam(self, unit, command, level):
+        field = unit["bindingStatusField"]
+        status_old = getattr(self.status, field)
+        status_new = level
+
+        mapLevelStatus = unit["map_level_status"]
+        if mapLevelStatus != None:
+            status_new = mapLevelStatus(self, unit, level)
+            if status_new == status_old:
+                Domoticz.Log("The command is consistent with the status:" + str(command))
+                return None
+
+        method = unit["map_level_method"]
+        method = rgetattr(self, method)
+        param = level
+        mapLevelParam = unit["map_level_param"]
+        if mapLevelParam != None:
+            param = mapLevelParam(self, unit, level)
+
+        result = method(param)
+        Domoticz.Log("Method call result:" + str(result))
+        if (result == ["ok"] or result == [] or int(result) == 0):
+            return status_new
+
+        return None
+
+    def MapStatusToWattText(self, unit, status):
+        # https://www.domoticz.com/forum/viewtopic.php?t=21978
+        # https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Electricity_.28instant_and_counter.29
+        avg = (self.lastWatt + status) / 2
+        second = int(time.time()) - self.lastTime
+
+        self.lastWatt = status
+        self.lastTime = int(time.time())
+        self.lastCount = self.lastCount + (avg / 1000) * (second / 60 / 60)
+        return str(status) + ";" + "{:.9f}".format(self.lastCount)
+
+    __UNIT_POWER = 1
+    __UNIT_TEMPERATURE = 2
+    __UNIT_ELECTRIC = 3
+    __UNIT_USB_POWER = 4
+    __UNIT_LED = 5
+    
+    __UNITS = [
+        {
+            "_Name": "ChuangmiPlug_Power", 
+            "_Unit": __UNIT_POWER, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 1,
+            "bindingStatusField": "is_on",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { True: 1, False: 0 }, 
+            "map_status_text": { True: "On", False: "Off" },
+            "mapCommand": MapEnumCommandToMethod,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": {
+                "On": "miio.on",
+                "Off": "miio.off"
+            }
+        },
+        {
+            "_Name": "ChuangmiPlug_Temperature", 
+            "_Unit": __UNIT_TEMPERATURE, 
+            "_TypeName": "Temperature",
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "temperature"
+        },
+        {
+            "_Name": "ChuangmiPlug_Electric", 
+            "_Unit": __UNIT_ELECTRIC, 
+            "_TypeName": "kWh",
+            # General / kWh
+            "_Switchtype": None,
+            "_Options": None,
+            "_Image": None,
+            "bindingStatusField": "load_power",
+            "mapStatus": MapStatus,
+            "map_status_value": 0, 
+            "map_status_text": MapStatusToWattText,
+        },
+        {
+            "_Name": "ChuangmiPlug_USB_Power", 
+            "_Unit": __UNIT_USB_POWER, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 1,
+            "bindingStatusField": "usb_power",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { True: 1, False: 0 }, 
+            "map_status_text": { True: "On", False: "Off" },
+            "mapCommand": MapEnumCommandToMethod,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": {
+                "On": "miio.usb_on",
+                "Off": "miio.usb_off"
+            }
+        },
+        {
+            "_Name": "ChuangmiPlug_LED", 
+            "_Unit": __UNIT_LED, 
+            "_TypeName": "Selector Switch", 
+            # Selector Switch / On/Off
+            "_Switchtype": 0,
+            "_Options": None,
+            "_Image": 0,
+            "bindingStatusField": "wifi_led",
+            "mapStatus": MapEnumStatus,
+            "map_status_value": { True: 1, False: 0 }, 
+            "map_status_text": { True: "On", False: "Off" },
+            "mapCommand": MapEnumCommandToMethodParam,
+            "map_command_status": { "On": True, "Off": False },
+            "map_command_method": "miio.set_wifi_led",
+            "map_command_method_param": { "On": True, "Off": False }
+        }
+    ]
 
     def __init__(self):
         self.miio = None
         self.status = None
+        self.lastWatt = 0
+        self.lastCount = 0
+        self.lastTime = int(time.time())
         return
 
     def onStart(self):
@@ -154,13 +393,13 @@ class ChuangmiPlugPlugin:
             Domoticz.Debugging(1)
             debug = 1
 
-        if (Parameters["Mode1"] == 'ptvsd'):
+        if (Parameters["Mode1"] == "ptvsd"):
             Domoticz.Log("Debugger ptvsd started, use 0.0.0.0:5678 to attach")
             import ptvsd
             # signal error on raspberry
             ptvsd.enable_attach()
             ptvsd.wait_for_attach()
-        elif (Parameters["Mode1"] == 'rpdb'):
+        elif (Parameters["Mode1"] == "rpdb"):
             Domoticz.Log("Debugger rpdb started, use 'telnet 127.0.0.1 4444' on host to connect")
             import rpdb
             rpdb.set_trace()
@@ -180,48 +419,28 @@ class ChuangmiPlugPlugin:
             + "' and token '" + token
             + "' and mode '" + mode + "'")
 
-        # Add main devices
-        if (self.unit_main not in Devices):
-            # See https://github.com/domoticz/domoticz/blob/development/hardware/hardwaretypes.h for device types
-            Domoticz.Device(
-                Name = "Chuangmi plug", 
-                Unit = self.unit_main, 
-                Type = 244, 
-                Subtype = 62,
-                Image = 1).Create()
-        if (self.unit_temp not in Devices):
-            Domoticz.Device(
-                Name = "Chuangmi plug temperature", 
-                Unit = self.unit_temp, 
-                Type = 80, 
-                Subtype = 5).Create()
-
         # Read function
         self.UpdateStatus(False)
 
-        # Add optional devices
-        if (self.status.load_power is not None 
-            and self.unit_load not in Devices):
-            Domoticz.Device(
-                Name = "Chuangmi plug electric", 
-                Unit = self.unit_load, 
-                Type = 243, 
-                Subtype = 29).Create()
-        if (self.status.usb_power is not None 
-            and self.unit_usb not in Devices):
-            Domoticz.Device(
-                Name = "Chuangmi plug usb", 
-                Unit = self.unit_usb, 
-                Type = 244, 
-                Subtype = 62,
-                Image = 1).Create()
-        if (self.status.wifi_led is not None 
-            and self.unit_led not in Devices):
-            Domoticz.Device(
-                Name = "Chuangmi plug led", 
-                Unit = self.unit_led, 
-                Type = 244, 
-                Subtype = 62).Create()
+        # Create devices
+        for unit in self.__UNITS:
+            field = unit["bindingStatusField"]
+            value = getattr(self.status, field)
+            if value is not None and unit["_Unit"] not in Devices:
+                if "_Switchtype" in unit and unit["_Switchtype"] != None:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Switchtype = unit["_Switchtype"],
+                        Image = unit["_Image"],
+                        Options = unit["_Options"]).Create()
+                else:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Options = unit["_Options"]).Create()
 
         # Read initial state
         self.UpdateStatus()
@@ -245,26 +464,16 @@ class ChuangmiPlugPlugin:
     def onCommand(self, Unit, Command, Level, Hue):
         Domoticz.Debug("onCommand called: Unit=" + str(Unit) + ", Parameter=" + str(Command) + ", Level=" + str(Level))
 
-        if (self.unit_main == Unit):
-            if ("On" == Command):
-                self.TurnOn()
-            elif ("Off" == Command):
-                self.TurnOff()
-        elif (self.unit_usb == Unit):
-            if ("On" == Command):
-                self.TurnOnUsb()
-            elif ("Off" == Command):
-                self.TurnOffUsb()
-        elif (self.unit_led == Unit):
-            if ("On" == Command):
-                self.TurnOnWifiLed()
-            elif ("Off" == Command):
-                self.TurnOffWifiLed()
-        else:
-            Domoticz.Error("Unknown Unit number : " + str(Unit))
-
-        # update status
-        self.UpdateStatus()
+        unit = FindUnit(self.__UNITS, Unit)
+        if unit is not None and "mapCommand" in unit.keys():
+            status = unit["mapCommand"](self, unit, Command, Level)
+            if status != None:
+                # Update device
+                field = unit["bindingStatusField"]
+                setattr(self.status, field, status)
+                vt = unit["mapStatus"](self, unit, status)
+                UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
+            return
         return
 
     def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
@@ -279,116 +488,29 @@ class ChuangmiPlugPlugin:
         self.heartbeat.beatHeartbeat()
         return
         
+
     def UpdateStatus(self, updateDevice = True):
-        if not hasattr(self, 'miio'):
+        if not hasattr(self, "miio"):
             return
         self.status = self.miio.status()
-        log = "Status : On = " + str(self.status.is_on) + \
-                ", Power = " + str(self.status.power) + \
-                ", Temperature = " + str(self.status.temperature)
-        if(self.status.load_power):
-            log = log + ", Load Power = " + str(self.status.load_power)
-        if(self.status.usb_power):
-            log = log + ", Usb Power = " + str(self.status.usb_power)
-        if(self.status.wifi_led):
-            log = log + ", Wifi Led = " + str(self.status.wifi_led)
-
+        self.status = CacheStatus(self.status)
+        log = "Status : " + self.status.toString()
         Domoticz.Debug(log)
 
-        if (not updateDevice):
-            self.status = CacheStatus(self.status)
-            return
-
-        if (self.status.is_on == True):
-            UpdateDevice(self.unit_main, 1, "On")
-        else:
-            UpdateDevice(self.unit_main, 0, "Off")
-
-        if (self.status.usb_power == True):
-            UpdateDevice(self.unit_usb, 1, "On")
-        elif (self.status.usb_power == False):
-            UpdateDevice(self.unit_usb, 0, "Off")
-
-        if (self.status.wifi_led == True):
-            UpdateDevice(self.unit_led, 1, "On")
-        elif (self.status.wifi_led == False):
-            UpdateDevice(self.unit_led, 0, "Off")
-
-        if (self.status.temperature):
-            UpdateDevice(self.unit_temp, self.status.temperature, str(self.status.temperature))
-        if (self.status.load_power):
-            # https://www.domoticz.com/forum/viewtopic.php?t=21978
-            # https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Electricity_.28instant_and_counter.29
-            UpdateDevice(self.unit_load, 0, str(self.status.load_power) + ';0.000')
-
-        self.status = CacheStatus(self.status)
+        # Update devices
+        if (updateDevice):
+            for unit in self.__UNITS:
+                field = unit["bindingStatusField"]
+                status = getattr(self.status, field)
+                if status is None:
+                    pass
+                elif "mapStatus" in unit.keys():
+                    vt = unit["mapStatus"](self, unit, status)
+                    UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
+                else:
+                    UpdateDevice(unit["_Unit"], status, str(status))
         return
 
-    def TurnOn(self):
-        if (self.status.is_on == False):
-            result = self.miio.on()
-            Domoticz.Log("Turn on result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = True
-                UpdateDevice(self.unit_main, 1, "On")
-            else:
-                Domoticz.Log("Turn on failure:" + str(result))
-        return
-
-    def TurnOff(self):
-        if (self.status.is_on == True):
-            result = self.miio.off()
-            Domoticz.Log("Turn off result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = False
-                UpdateDevice(self.unit_main, 0, "Off")
-            else:
-                Domoticz.Log("Turn off failure:" + str(result))
-        return
-
-    def TurnOnUsb(self):
-        if (self.status.usb_power == False):
-            result = self.miio.usb_on()
-            Domoticz.Log("Turn usb on result:" + str(result))
-            if (int(result) == 0 or result == ["ok"]):
-                self.status.usb_power = True
-                UpdateDevice(self.unit_usb, 1, "On")
-            else:
-                Domoticz.Log("Turn usb on failure:" + str(result))
-        return
-
-    def TurnOffUsb(self):
-        if (self.status.usb_power == True):
-            result = self.miio.usb_off()
-            Domoticz.Log("Turn usb off result:" + str(result))
-            if (int(result) == 0 or result == ["ok"]):
-                self.status.usb_power = False
-                UpdateDevice(self.unit_usb, 0, "Off")
-            else:
-                Domoticz.Log("Turn usb off failure:" + str(result))
-        return
-
-    def TurnOnWifiLed(self):
-        if (self.status.wifi_led == False):
-            result = self.miio.set_wifi_led(True)
-            Domoticz.Log("Turn led on result:" + str(result))
-            if (result == ["ok"]):
-                self.status.wifi_led = True
-                UpdateDevice(self.unit_led, 1, "On")
-            else:
-                Domoticz.Log("Turn usb off failure:" + str(result))
-        return
-
-    def TurnOffWifiLed(self):
-        if (self.status.wifi_led == True):
-            result = self.miio.set_wifi_led(False)
-            Domoticz.Log("Turn led off result:" + str(result))
-            if (result == ["ok"]):
-                self.status.wifi_led = False
-                UpdateDevice(self.unit_led, 0, "Off")
-            else:
-                Domoticz.Log("Turn usb off failure:" + str(result))
-        return
 
 global _plugin
 _plugin = ChuangmiPlugPlugin()
@@ -450,3 +572,20 @@ def UpdateDevice(Unit, nValue, sValue):
         # and for unknown reason crash if Update methode is called whitout explicit parameters
         Devices[Unit].Update(nValue = nValue, sValue = str(sValue))
     return
+
+def FindUnit(Units, unit):
+    for item in Units:
+        if item["_Unit"] == unit:
+            return item
+    return None
+
+def rsetattr(obj, attr, val):
+    pre, _, post = attr.rpartition('.')
+    return setattr(rgetattr(obj, pre) if pre else obj, post, val)
+
+# using wonder's beautiful simplification: https://stackoverflow.com/questions/31174295/getattr-and-setattr-on-nested-objects/31174427?noredirect=1#comment86638618_31174427
+
+def rgetattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+    return functools.reduce(_getattr, [obj] + attr.split('.'))
