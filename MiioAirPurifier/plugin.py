@@ -284,7 +284,7 @@ class AirPurifierPlugin:
     __UNIT_SLEEP_MODE_LEARN_COUNT = 10
     __UNIT_SLEEP_TIME = 11
     __UNIT_TEMPERATURE = 12
-    __UNIT_USED_TIME 13
+    __UNIT_USED_TIME = 13
 
     __UNIT_POWER = 20
     __UNIT_RESET_FILTER = 21
@@ -556,7 +556,7 @@ class AirPurifierPlugin:
         },
         {
             "_Name": "AirPurifier_LED", 
-            "_Unit": __UNIT_LED 
+            "_Unit": __UNIT_LED,
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
@@ -661,10 +661,9 @@ class AirPurifierPlugin:
         # Create miio
         ip = Parameters["Address"]
         token = Parameters["Mode3"]
-        self.miio = miio.chuangmi_plug.AirPurifier(ip, token, 0, debug, True)
+        self.miio = miio.airpurifier.AirPurifier(ip, token, 0, debug, True)
         Domoticz.Debug("Xiaomi AirPurifier created with address '" + ip
-            + "' and token '" + token
-            + "' and mode '" + mode + "'")
+            + "' and token '" + token + "'")
 
         # Read function
         self.UpdateStatus(False)
