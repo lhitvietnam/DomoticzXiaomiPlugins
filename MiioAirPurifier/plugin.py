@@ -440,7 +440,7 @@ class AirPurifierPlugin:
             "_Unit": __UNIT_TEMPERATURE, 
             "_TypeName": "Temperature",
             "_Options": None,
-            "bindingStatusField": "temperature"
+            "bindingStatusField": "temperature",
             "mapStatus": MapStatus,
             "map_status_value": 1, 
             "map_status_text": None
