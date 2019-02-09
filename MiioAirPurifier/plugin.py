@@ -353,7 +353,7 @@ class AirPurifierPlugin:
             "_Unit": __UNIT_FILTER_LIFE_REMAINING, 
             "_TypeName": "Custom",
             "_Options": {
-                "Custom": "1;h"
+                "Custom": "1;%"
             }, 
             "bindingStatusField": "filter_life_remaining",
             "mapStatus": MapStatus,
@@ -405,7 +405,7 @@ class AirPurifierPlugin:
             "_Unit": __UNIT_PURIFY_VOLUME, 
             "_TypeName": "Custom",
             "_Options": {
-                "Custom": "1;Speed"
+                "Custom": "1;m³"
             }, 
             "bindingStatusField": "purify_volume",
             "mapStatus": MapStatus,
