@@ -273,9 +273,9 @@ class AirPurifierPlugin:
         return None
 
     # fix humidity
-    def MapTextHumidity(value):
+    def MapTextHumidity(self, unit, status):
         sValue = 0
-        n = int(value)
+        n = int(status)
         if n < 46:
             sValue = 2        #dry
         elif n > 70:
@@ -301,7 +301,6 @@ class AirPurifierPlugin:
     __UNIT_POWER = 20
     __UNIT_RESET_FILTER = 21
     __UNIT_AUTO_DETECT = 22
-    __UNIT_AUTO_DETECT = 23
     __UNIT_BUZZER = 24
     __UNIT_CHILD_LOCK = 25
     __UNIT_EXTRA_FEATURES = 26
@@ -442,6 +441,9 @@ class AirPurifierPlugin:
             "_TypeName": "Temperature",
             "_Options": None,
             "bindingStatusField": "temperature"
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Use_time", 
