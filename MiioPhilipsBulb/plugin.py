@@ -459,6 +459,9 @@ class PhilipsBulbPlugin:
         log = "Status : " + self.status.toString()
         Domoticz.Debug(log)
 
+        # Shared `On` and `Off` for multiple devices
+        # Data push will cause confusion
+
         # MUSE THIS ORDER
         # on image with level title
         # off image with 'Off' title
