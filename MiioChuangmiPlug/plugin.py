@@ -290,6 +290,7 @@ class ChuangmiPlugPlugin:
         self.lastWatt = status
         self.lastTime = int(time.time())
         self.lastCount = self.lastCount + (avg / 1000) * (second / 60 / 60)
+        # format is Instant;Usage
         return str(status) + ";" + "{:.9f}".format(self.lastCount)
 
 
