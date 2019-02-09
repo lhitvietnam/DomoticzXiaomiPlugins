@@ -129,7 +129,7 @@ class CacheStatus(object):
     def toString(self):
         l = []
         for attr in dir(self.status):
-            if(attr[:2] != "__" and attr != 'data'):
+            if(attr[:1] != "_" and attr != 'data'):
                 value = getattr(self.status, attr)
                 l.append(str(attr + ' = ' + str(value)) )
         return ', '.join(l)
