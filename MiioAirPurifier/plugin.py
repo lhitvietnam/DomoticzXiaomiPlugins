@@ -272,6 +272,18 @@ class AirPurifierPlugin:
 
         return None
 
+    # fix humidity
+    def MapTextHumidity(value):
+        sValue = 0
+        n = int(value)
+        if n < 46:
+            sValue = 2        #dry
+        elif n > 70:
+            sValue = 3        #wet
+        else:
+            sValue = 1        #comfortable
+        return sValue
+
     __UNIT_AQI = 1
     __UNIT_AVG_AQI = 2
     __UNIT_FILTER_HOURS_USED = 3
@@ -305,55 +317,64 @@ class AirPurifierPlugin:
             "_Name": "AirPurifier_AQI", 
             "_Unit": __UNIT_AQI, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;μg/m³"
             },
-            "bindingStatusField": "aqi"
+            "bindingStatusField": "aqi",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Average_AQI", 
             "_Unit": __UNIT_AVG_AQI, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;μg/m³"
             }, 
-            "bindingStatusField": "average_aqi"
+            "bindingStatusField": "average_aqi",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Filter_Hours_Used", 
             "_Unit": __UNIT_FILTER_HOURS_USED, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;h"
             }, 
-            "bindingStatusField": "filter_hours_used"
+            "bindingStatusField": "filter_hours_used",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_filter_life_remaining", 
             "_Unit": __UNIT_FILTER_LIFE_REMAINING, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;h"
             }, 
-            "bindingStatusField": "filter_life_remaining"
+            "bindingStatusField": "filter_life_remaining",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Humidity", 
             "_Unit": __UNIT_HUMIDITY, 
             "_TypeName": "Humidity",
-            "_Switchtype": None,
             "_Options": None,
-            "bindingStatusField": "humidity" 
+            "bindingStatusField": "humidity",
+            "mapStatus": MapStatus,
+            "map_status_value": None, 
+            "map_status_text": MapTextHumidity
         },
         {
             "_Name": "AirPurifier_Illuminance", 
             "_Unit": __UNIT_ILLUMINANCE, 
             "_TypeName": "Lux", 
-            "_Switchtype": None,
             "_Options": None,
             "bindingStatusField": "illuminance" 
         },
@@ -361,57 +382,64 @@ class AirPurifierPlugin:
             "_Name": "AirPurifier_Motor_speed", 
             "_Unit": __UNIT_MOTOR_SPEED, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Speed"
             }, 
-            "bindingStatusField": "motor_speed" 
+            "bindingStatusField": "motor_speed",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Motor2_speed", 
             "_Unit": __UNIT_MOTOR2_SPEED, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Speed"
             }, 
-            "bindingStatusField": "motor2_speed" 
+            "bindingStatusField": "motor2_speed",
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Purify_Volume", 
             "_Unit": __UNIT_PURIFY_VOLUME, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Speed"
             }, 
-            "bindingStatusField": "purify_volume" 
+            "bindingStatusField": "purify_volume",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Sleep_Mode_Learn_Count", 
             "_Unit": __UNIT_SLEEP_MODE_LEARN_COUNT, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Count"
             }, 
-            "bindingStatusField": "sleep_mode_learn_count" 
+            "bindingStatusField": "sleep_mode_learn_count",
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Sleep_Time", 
             "_Unit": __UNIT_SLEEP_TIME, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Count"
             }, 
-            "bindingStatusField": "sleep_time" 
+            "bindingStatusField": "sleep_time",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         {
             "_Name": "AirPurifier_Temperature", 
             "_Unit": __UNIT_TEMPERATURE, 
             "_TypeName": "Temperature",
-            "_Switchtype": None,
             "_Options": None,
             "bindingStatusField": "temperature"
         },
@@ -419,11 +447,13 @@ class AirPurifierPlugin:
             "_Name": "AirPurifier_Use_time", 
             "_Unit": __UNIT_USED_TIME, 
             "_TypeName": "Custom",
-            "_Switchtype": None,
             "_Options": {
                 "Custom": "1;Seconds"
             }, 
-            "bindingStatusField": "use_time" 
+            "bindingStatusField": "use_time",
+            "mapStatus": MapStatus,
+            "map_status_value": 1, 
+            "map_status_text": None
         },
         # button_pressed
         # filter_rfid_product_id
@@ -438,6 +468,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": 7,
             "_Options": None,
             "bindingStatusField": "is_on",
             "mapStatus": MapEnumStatus,
@@ -456,9 +487,9 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / Push On Button
             "_Switchtype": 9,
+            "_Image": None,
             "_Options": None,
             "bindingStatusField": "is_on",
-            "mapStatus": MapStatus,
             "mapCommand": MapEnumCommandToMethod,
             "map_command_status": { "On": True, "Off": False },
             "map_command_method": {
@@ -471,6 +502,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": 9,
             "_Options": None,
             "bindingStatusField": "auto_detect",
             "mapStatus": MapEnumStatus,
@@ -487,6 +519,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": 9,
             "_Options": None,
             "bindingStatusField": "buzzer",
             "mapStatus": MapEnumStatus,
@@ -503,6 +536,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": 9,
             "_Options": None,
             "bindingStatusField": "child_lock",
             "mapStatus": MapEnumStatus,
@@ -519,6 +553,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / Push On Button
             "_Switchtype": 9,
+            "_Image": None,
             "_Options": None,
             "bindingStatusField": "extra_features"
         },
@@ -528,6 +563,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / Dimmer
             "_Switchtype": 7,
+            "_Image": None,
             "_Options": None,
             "bindingStatusField": "favorite_level",
             "mapStatus": MapStatus,
@@ -544,6 +580,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": 7,
             "_Options": None,
             "bindingStatusField": "learn_mode",
             "mapStatus": MapEnumStatus,
@@ -560,6 +597,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
+            "_Image": None,
             "_Options": None,
             "bindingStatusField": "led",
             "mapStatus": MapEnumStatus,
@@ -576,6 +614,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / Selector
             "_Switchtype": 18,
+            "_Image": 7,
             "_Options": {
                 "LevelActions"  :"|||" , 
                 "LevelNames"    :"Off|Dim|Bright" ,
@@ -596,6 +635,7 @@ class AirPurifierPlugin:
             "_Unit": __UNIT_MODE, 
             "_TypeName": "Selector Switch", 
             "_Switchtype": 18,
+            "_Image": 7,
             "_Options": {
                 "LevelActions"  :"|||||" , 
                 "LevelNames"    :"None|Auto|Favorite|High|Idle|Medium|Silent|Strong" ,
@@ -645,6 +685,7 @@ class AirPurifierPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / Dimmer
             "_Switchtype": 7,
+            "_Image": None,
             "_Options": None,
             "bindingStatusField": "volume",
             "mapStatus": MapStatus,
@@ -701,12 +742,20 @@ class AirPurifierPlugin:
             field = unit["bindingStatusField"]
             value = getattr(self.status, field)
             if value is not None and unit["_Unit"] not in Devices:
-                Domoticz.Device(
-                    Name = unit["_Name"], 
-                    Unit = unit["_Unit"],
-                    TypeName = unit["_TypeName"], 
-                    Switchtype = unit["_Switchtype"],
-                    Options = unit["_Options"]).Create()
+                if "_Switchtype" in unit and unit["_Switchtype"] != None:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Switchtype = unit["_Switchtype"],
+                        Image = unit["_Image"],
+                        Options = unit["_Options"]).Create()
+                else:
+                    Domoticz.Device(
+                        Name = unit["_Name"], 
+                        Unit = unit["_Unit"],
+                        TypeName = unit["_TypeName"], 
+                        Options = unit["_Options"]).Create()
 
         # Read initial state
         self.UpdateStatus()
@@ -776,7 +825,7 @@ class AirPurifierPlugin:
                     vt = unit["mapStatus"](self, unit, status)
                     UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
                 else:
-                    UpdateDevice(unit["_Unit"], status, str(status))
+                    UpdateDevice(unit["_Unit"], status, status)
         return
 
 

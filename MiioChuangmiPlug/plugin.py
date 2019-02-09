@@ -292,6 +292,7 @@ class ChuangmiPlugPlugin:
         self.lastCount = self.lastCount + (avg / 1000) * (second / 60 / 60)
         return str(status) + ";" + "{:.9f}".format(self.lastCount)
 
+
     __UNIT_POWER = 1
     __UNIT_TEMPERATURE = 2
     __UNIT_ELECTRIC = 3
@@ -305,8 +306,8 @@ class ChuangmiPlugPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 1,
+            "_Options": None,
             "bindingStatusField": "is_on",
             "mapStatus": MapEnumStatus,
             "map_status_value": { True: 1, False: 0 }, 
@@ -322,9 +323,7 @@ class ChuangmiPlugPlugin:
             "_Name": "ChuangmiPlug_Temperature", 
             "_Unit": __UNIT_TEMPERATURE, 
             "_TypeName": "Temperature",
-            "_Switchtype": None,
             "_Options": None,
-            "_Image": None,
             "bindingStatusField": "temperature"
         },
         {
@@ -332,13 +331,11 @@ class ChuangmiPlugPlugin:
             "_Unit": __UNIT_ELECTRIC, 
             "_TypeName": "kWh",
             # General / kWh
-            "_Switchtype": None,
             "_Options": None,
-            "_Image": None,
             "bindingStatusField": "load_power",
             "mapStatus": MapStatus,
             "map_status_value": 0, 
-            "map_status_text": MapStatusToWattText,
+            "map_status_text": MapStatusToWattText
         },
         {
             "_Name": "ChuangmiPlug_USB_Power", 
@@ -346,8 +343,8 @@ class ChuangmiPlugPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 1,
+            "_Options": None,
             "bindingStatusField": "usb_power",
             "mapStatus": MapEnumStatus,
             "map_status_value": { True: 1, False: 0 }, 
@@ -365,8 +362,8 @@ class ChuangmiPlugPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 0,
+            "_Options": None,
             "bindingStatusField": "wifi_led",
             "mapStatus": MapEnumStatus,
             "map_status_value": { True: 1, False: 0 }, 
@@ -508,7 +505,7 @@ class ChuangmiPlugPlugin:
                     vt = unit["mapStatus"](self, unit, status)
                     UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
                 else:
-                    UpdateDevice(unit["_Unit"], status, str(status))
+                    UpdateDevice(unit["_Unit"], status, status)
         return
 
 

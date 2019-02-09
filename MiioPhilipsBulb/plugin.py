@@ -294,11 +294,9 @@ class PhilipsBulbPlugin:
             "_Switchtype": 7,
             "_Options": None,
             "bindingStatusField": "brightness",
-
             "mapStatus": MapStatus,
             "map_status_value": 2, 
             "map_status_text": None,
-
             "mapCommand": MapEnumCommandToMethodOrLevelToMethodParam,
             "map_command_status": { "On": True, "Off": False },
             "map_command_method": {
@@ -317,11 +315,9 @@ class PhilipsBulbPlugin:
             "_Switchtype": 7,
             "_Options": None,
             "bindingStatusField": "color_temperature",
-            
             "mapStatus": MapStatus,
             "map_status_value": 2, 
             "map_status_text": None,
-            
             "mapCommand": MapEnumCommandToMethodOrLevelToMethodParam,
             "map_command_status": { "On": True, "Off": False },
             "map_command_method": {
@@ -344,11 +340,9 @@ class PhilipsBulbPlugin:
                 "SelectorStyle" :"0"
             },
             "bindingStatusField": "scene",
-            
             "mapStatus": MapStatus,
             "map_status_value": 2, 
             "map_status_text": { 0: "0", 1: "10", 2: "20", 3: "30", 4: "40" },
-
             "mapCommand": MapEnumLevelToMethodParam,
             "map_level_status": { 10: 1, 20: 2, 30: 3, 40: 4 },
             "map_level_method": "miio.set_scene",
@@ -456,84 +450,6 @@ class PhilipsBulbPlugin:
             return
         return
 
-        if (self.__UNIT_BRIGHTNESS == Unit):
-            if ("On" == Command):
-                self.TurnOn()
-            elif ("Off" == Command):
-                self.TurnOff()
-            else :
-                self.ChangeBrightness(Level,Level)
-        elif (self.__UNIT_COLOR_TEMPERATURE == Unit):
-            if ("On" == Command):
-                self.TurnOn()
-            elif ("Off" == Command):
-                self.TurnOff()
-            else :
-                self.ChangeColorTemperature(Level,Level)
-        elif (self.__UNIT_SCENE == Unit):
-            value = GetValueByLevel(self.__UNITS, self.__UNIT_SCENE, str(Level))
-            self.ChangeScene(value, Level)
-        else:
-            Domoticz.Error("Unknown Unit number : " + str(Unit))
-
-        # update status
-        self.UpdateStatus()
-        return
-
-    def TurnOn(self):
-        if (self.status.is_on == False):
-            result = self.miio.on()
-            Domoticz.Log("Turn on result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = True
-                UpdateDevice(self.__UNIT_BRIGHTNESS, 1, "On")
-                UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 1, "On")
-            else:
-                Domoticz.Log("Turn on failure:" + str(result))
-        return
-
-    def TurnOff(self):
-        if (self.status.is_on == True):
-            result = self.miio.off()
-            Domoticz.Log("Turn off result:" + str(result))
-            if (result == ["ok"] or result == []):
-                self.status.is_on = False
-                UpdateDevice(self.__UNIT_BRIGHTNESS, 0, "Off")
-                UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 0, "Off")
-            else:
-                Domoticz.Log("Turn off failure:" + str(result))
-        return
-
-    def ChangeBrightness(self, brightness, level):
-        result = self.miio.set_brightness(brightness)
-        Domoticz.Log("Set brightness result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.brightness = brightness
-            UpdateDevice(self.__UNIT_BRIGHTNESS, 2, level)
-        else:
-            Domoticz.Log("Set brightness failure:" + str(result))
-        return
-        
-    def ChangeColorTemperature(self, color_temperature, level):
-        result = self.miio.set_color_temperature(color_temperature)
-        Domoticz.Log("Set color temperature result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.color_temperature = color_temperature
-            UpdateDevice(self.__UNIT_COLOR_TEMPERATURE, 2, level)
-        else:
-            Domoticz.Log("Set color temperature failure:" + str(result))
-        return
-
-    def ChangeScene(self, scene, level):
-        result = self.miio.set_scene(scene)
-        Domoticz.Log("Set scene result:" + str(result))
-        if (result == ["ok"] or result == []):
-            self.status.scene = scene
-            UpdateDevice(self.__UNIT_SCENE, 2, level)
-        else:
-            Domoticz.Log("Set scene failure:" + str(result))
-        return
-
 
     def UpdateStatus(self):
         if not hasattr(self, 'miio'):
@@ -569,7 +485,7 @@ class PhilipsBulbPlugin:
                 vt = unit["mapStatus"](self, unit, status)
                 UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
             else:
-                UpdateDevice(unit["_Unit"], status, str(status))
+                UpdateDevice(unit["_Unit"], status, status)
 
         # level = self.status.brightness
         # UpdateDevice(self.__UNIT_BRIGHTNESS, 2, level)

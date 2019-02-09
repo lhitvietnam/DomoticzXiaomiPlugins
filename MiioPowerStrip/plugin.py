@@ -310,8 +310,8 @@ class PowerStripPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 1,
+            "_Options": None,
             "bindingStatusField": "is_on",
             "mapStatus": MapEnumStatus,
             "map_status_value": { True: 1, False: 0 }, 
@@ -327,9 +327,7 @@ class PowerStripPlugin:
             "_Name": "PowerStrip_Temperature", 
             "_Unit": __UNIT_TEMPERATURE, 
             "_TypeName": "Temperature",
-            "_Switchtype": None,
             "_Options": None,
-            "_Image": None,
             "bindingStatusField": "temperature"
         },
         {
@@ -337,9 +335,7 @@ class PowerStripPlugin:
             "_Unit": __UNIT_ELECTRIC, 
             "_TypeName": "kWh",
             # General / kWh
-            "_Switchtype": None,
             "_Options": None,
-            "_Image": None,
             "bindingStatusField": "load_power",
             "mapStatus": MapStatus,
             "map_status_value": 0, 
@@ -350,9 +346,7 @@ class PowerStripPlugin:
             "_Unit": __UNIT_VLOTAGE, 
             "_TypeName": "Voltage",
             # General / Voltage
-            "_Switchtype": None,
             "_Options": None,
-            "_Image": None,
             "bindingStatusField": "voltage",
             "mapStatus": MapStatus,
             "map_status_value": 0, 
@@ -365,9 +359,6 @@ class PowerStripPlugin:
             "_Options": {
                 "Custom": "0;"
             },
-            "_Switchtype": None,
-            "_Options": None,
-            "_Image": None,
             "bindingStatusField": "power_factor",
         },
         {
@@ -377,9 +368,6 @@ class PowerStripPlugin:
             "_Options": {
                 "Custom": "0;"
             },
-            "_Switchtype": None,
-            "_Options": None,
-            "_Image": None,
             "bindingStatusField": "power_price",
         },
         {
@@ -389,9 +377,6 @@ class PowerStripPlugin:
             "_Options": {
                 "Custom": "0;"
             },
-            "_Switchtype": None,
-            "_Options": None,
-            "_Image": None,
             "bindingStatusField": "current",
         },
         {
@@ -401,9 +386,6 @@ class PowerStripPlugin:
             "_Options": {
                 "Custom": "0;"
             },
-            "_Switchtype": None,
-            "_Options": None,
-            "_Image": None,
             "bindingStatusField": "leakage_current",
         },
         {
@@ -412,8 +394,8 @@ class PowerStripPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 9,
+            "_Options": None,
             "bindingStatusField": "mode",
             "mapStatus": MapEnumStatus,
             "map_status_value": { miio.powerstrip.PowerMode.Eco: 1, miio.powerstrip.PowerMode.Normal: 0 }, 
@@ -430,8 +412,8 @@ class PowerStripPlugin:
         #     "_TypeName": "Selector Switch", 
         #     # Selector Switch / On/Off
         #     "_Switchtype": 0,
-        #     "_Options": None,
         #     "_Image": 0,
+        #     "_Options": None,
         #     "bindingStatusField": "?",
         #     "mapStatus": MapEnumStatus,
         #     "map_status_value": { True: 1, False: 0 }, 
@@ -447,8 +429,8 @@ class PowerStripPlugin:
             "_TypeName": "Selector Switch", 
             # Selector Switch / On/Off
             "_Switchtype": 0,
-            "_Options": None,
             "_Image": 0,
+            "_Options": None,
             "bindingStatusField": "wifi_led",
             "mapStatus": MapEnumStatus,
             "map_status_value": { True: 1, False: 0 }, 
@@ -594,7 +576,7 @@ class PowerStripPlugin:
                     vt = unit["mapStatus"](self, unit, status)
                     UpdateDevice(unit["_Unit"], vt["value"], vt["text"])
                 else:
-                    UpdateDevice(unit["_Unit"], status, str(status))
+                    UpdateDevice(unit["_Unit"], status, status)
         return
 
 
