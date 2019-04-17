@@ -329,7 +329,11 @@ class PowerStripPlugin:
             "_Unit": __UNIT_TEMPERATURE, 
             "_TypeName": "Temperature",
             "_Options": None,
-            "bindingStatusField": "temperature"
+            "bindingStatusField": "temperature",
+            "mapStatus": MapStatus,
+            "map_status_value": 0, 
+            "map_status_text": None,
+
         },
         {
             "_Name": "PowerStrip_Electric", 
@@ -374,11 +378,12 @@ class PowerStripPlugin:
         {
             "_Name": "PowerStrip_Current", 
             "_Unit": __UNIT_CURRENT, 
-            "_TypeName": "Custom",
-            "_Options": {
-                "Custom": "0;"
-            },
+            "_TypeName": "Current (Single)",
+            "_Options": None,
             "bindingStatusField": "current",
+	    "mapStatus": MapStatus,
+            "map_status_value": 0, 
+            "map_status_text": None,
         },
         {
             "_Name": "PowerStrip_Leakage_Current", 
